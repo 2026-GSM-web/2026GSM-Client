@@ -46,6 +46,34 @@ export default function CreatePolicyPage() {
     router.push('/policies');
   };
 
+  // ------------------------------------------------------------- //
+  // 1. 로그인 전: 콜백 에러 화면과 동일하게 화면 중앙에 로그인 유도 카드만 표시
+  // ------------------------------------------------------------- //
+  if (!isLogged) {
+    return (
+      <main className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm">
+          <div className="p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-black/5 dark:bg-white/5">
+            <h1 className="text-2xl font-bold mb-3">정책 제안하기</h1>
+            <p className="text-sm text-zinc-500 mb-8">
+              학생회 정책 제안을 작성하려면 DataGSM 계정 로그인이 필요합니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => login()}
+              className="w-full py-3.5 bg-amber-600 text-white font-semibold text-sm rounded-xl hover:bg-amber-700 transition"
+            >
+              DataGSM 계정으로 로그인하기
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ------------------------------------------------------------- //
+  // 2. 로그인 후: 정책 제안 작성 폼 표시
+  // ------------------------------------------------------------- //
   return (
     <main className="max-w-xl mx-auto px-6 py-12">
       <button
@@ -55,30 +83,8 @@ export default function CreatePolicyPage() {
         ← 목록으로
       </button>
 
-      {/* ------------------------------------------------------------- */}
-      {/* 1. 로그인 전: DataGSM 로그인 유도 카드만 표시 */}
-      {/* ------------------------------------------------------------- */}
-      {!isLogged ? (
-        <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-black/5 dark:bg-white/5">
-          <h1 className="text-2xl font-bold mb-3">정책 제안하기</h1>
-          <p className="text-sm text-zinc-500 mb-8">
-            학생회 정책 제안을 작성하려면 DataGSM 계정 로그인이 필요합니다.
-          </p>
-          <button
-            type="button"
-            onClick={() => login()}
-            className="w-full py-3.5 bg-amber-600 text-white font-semibold text-sm rounded-xl hover:bg-amber-700 transition"
-          >
-            DataGSM 계정으로 로그인하기
-          </button>
-        </div>
-      ) : (
-        /* ------------------------------------------------------------- */
-        /* 2. 로그인 후: 정책 제안 작성 폼 표시 */
-        /* ------------------------------------------------------------- */
-        <>
-          <h1 className="text-2xl font-bold mb-6">정책 제안</h1>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <h1 className="text-2xl font-bold mb-6">정책 제안</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-semibold block mb-1">
                 작성자 이름
@@ -143,9 +149,7 @@ export default function CreatePolicyPage() {
             >
               제안 등록하기
             </button>
-          </form>
-        </>
-      )}
+      </form>
     </main>
   );
 }
