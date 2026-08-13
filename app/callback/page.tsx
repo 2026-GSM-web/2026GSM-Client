@@ -28,7 +28,7 @@ function CallbackContent() {
 
     return (
       <main className="min-h-screen flex items-center justify-center px-4">
-        <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-black/5 dark:bg-white/5 text-center">
+        <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5 text-center">
           <span className="text-xs font-bold text-red-500 tracking-wider">LOGIN FAILED</span>
           <h1 className="text-xl font-bold">로그인에 실패했습니다</h1>
           <p className="text-sm opacity-70 leading-relaxed">{message}</p>
@@ -37,7 +37,7 @@ function CallbackContent() {
             <button
               type="button"
               onClick={() => login()}
-              className="w-full py-2.5 bg-amber-600 text-white font-semibold text-sm rounded-lg hover:bg-amber-700 transition"
+              className="w-full py-2.5 bg-blue-600 dark:bg-blue-500 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 dark:hover:bg-blue-400 transition"
             >
               다시 로그인하기
             </button>

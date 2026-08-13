@@ -4,13 +4,27 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 body {
-  background-color: white;
-  color: black;
+  background: linear-gradient(160deg, #eef4f8 0%, #e9efe9 55%, #e3ece4 100%);
+  color: #0f172a;
   transition-property: color, background-color;
   transition-duration: 200ms;
 }
 
 .dark body {
-  background-color: #18181b;
-  color: white;
+  background: #06070a;
+  color: #e2e8f0;
+}
+
+::selection {
+  background-color: rgba(37, 99, 235, 0.3);
+}
+
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.dark :focus-visible {
+  outline-color: #60a5fa;
 }
