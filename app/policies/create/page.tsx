@@ -53,7 +53,7 @@ export default function CreatePolicyPage() {
     return (
       <main className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
-          <div className="p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-black/5 dark:bg-white/5">
+          <div className="p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
             <h1 className="text-2xl font-bold mb-3">정책 제안하기</h1>
             <p className="text-sm text-zinc-500 mb-8">
               학생회 정책 제안을 작성하려면 DataGSM 계정 로그인이 필요합니다.
@@ -61,7 +61,7 @@ export default function CreatePolicyPage() {
             <button
               type="button"
               onClick={() => login()}
-              className="w-full py-3.5 bg-amber-600 text-white font-semibold text-sm rounded-xl hover:bg-amber-700 transition"
+              className="w-full py-3.5 bg-blue-600 dark:bg-blue-500 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 dark:hover:bg-blue-400 transition"
             >
               DataGSM 계정으로 로그인하기
             </button>
@@ -92,7 +92,7 @@ export default function CreatePolicyPage() {
               <input
                 type="text"
                 placeholder="예: 2학년 3반 학생"
-                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-amber-600"
+                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-blue-600 dark:focus:outline-blue-400"
                 value={form.author}
                 onChange={(e) => setForm({ ...form, author: e.target.value })}
               />
@@ -102,7 +102,7 @@ export default function CreatePolicyPage() {
                 관련 부서
               </label>
               <select
-                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-amber-600"
+                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-blue-600 dark:focus:outline-blue-400"
                 value={form.dept}
                 onChange={(e) => setForm({ ...form, dept: e.target.value })}
               >
@@ -127,7 +127,7 @@ export default function CreatePolicyPage() {
               <input
                 type="text"
                 placeholder="제목을 입력하세요"
-                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-amber-600"
+                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-blue-600 dark:focus:outline-blue-400"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
@@ -137,7 +137,7 @@ export default function CreatePolicyPage() {
               <textarea
                 rows={5}
                 placeholder="내용을 자세히 작성해 주세요"
-                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-amber-600"
+                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 focus:outline-blue-600 dark:focus:outline-blue-400"
                 value={form.body}
                 onChange={(e) => setForm({ ...form, body: e.target.value })}
               />
@@ -145,7 +145,7 @@ export default function CreatePolicyPage() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-amber-600 text-white font-semibold text-sm rounded-lg hover:bg-amber-700 transition"
+              className="w-full py-3 bg-blue-600 dark:bg-blue-500 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 dark:hover:bg-blue-400 transition"
             >
               제안 등록하기
             </button>
