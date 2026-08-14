@@ -64,7 +64,7 @@ export default function MembersPage() {
           {executives.map((e, idx) => (
             <div
               key={idx}
-              className="p-6 border border-black/10 dark:border-white/10 rounded-2xl shadow-sm bg-white/70 dark:bg-white/5"
+              className="p-6 border border-black/10 dark:border-white/10 rounded-2xl shadow-sm bg-white/70 dark:bg-white/5 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-blue-600/40 dark:hover:border-blue-400/40"
             >
               <div className="text-xl font-bold">
                 {e.name} <span className="text-xs font-normal opacity-50">{e.studentId}</span>
@@ -79,7 +79,7 @@ export default function MembersPage() {
         {departments.map((d, idx) => (
           <div
             key={idx}
-            className="p-5 border border-black/10 dark:border-white/10 rounded-2xl shadow-sm bg-white/70 dark:bg-white/5"
+            className="p-5 border border-black/10 dark:border-white/10 rounded-2xl shadow-sm bg-white/70 dark:bg-white/5 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-blue-600/40 dark:hover:border-blue-400/40"
           >
             <h2 className={`text-base font-bold pb-2 border-b border-black/10 dark:border-white/10 ${d.color}`}>
               {d.dept}
