@@ -82,6 +82,8 @@ export default function AdminPage() {
   });
   const [percentInput, setPercentInput] = useState(String(progressPercent));
 
+  const [newPledgeTitle, setNewPledgeTitle] = useState('');
+
   const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
 
   const VALID_CODES = ['gsm1!!', 'gsm2!!', 'gsm3!!'];
@@ -104,6 +106,27 @@ export default function AdminPage() {
     setPercentInput(String(value));
     localStorage.setItem('sc_progress_percent', String(value));
     window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleAddPledge = (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = newPledgeTitle.trim();
+    if (!title) return alert('공약 내용을 입력해 주세요.');
+
+    const newPledge: Pledge = {
+      id: `p${Date.now()}`,
+      title,
+      color: '#3b82f6',
+      done: false,
+    };
+    savePledges([...pledges, newPledge]);
+    setNewPledgeTitle('');
+  };
+
+  const handleDeletePledge = (pledgeId: string) => {
+    if (confirm('이 공약을 삭제하시겠습니까?')) {
+      savePledges(pledges.filter((p) => p.id !== pledgeId));
+    }
   };
 
   const handleResetPledges = () => {
@@ -249,6 +272,19 @@ export default function AdminPage() {
             </div>
           </div>
 
+          <form onSubmit={handleAddPledge} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="새 공약 내용을 입력하세요"
+              value={newPledgeTitle}
+              onChange={(e) => setNewPledgeTitle(e.target.value)}
+              className={INPUT_CLASS}
+            />
+            <button type="submit" className={`px-4 shrink-0 text-sm rounded-lg ${BTN_PRIMARY}`}>
+              추가
+            </button>
+          </form>
+
           <div className="space-y-3">
           <p className="text-xs opacity-50">이행 체크를 하면 그 공약이 &apos;완수&apos;로 표시되고, 대시보드의 완수 목록에 나타나요.</p>
           {pledges.map((p) => (
@@ -279,6 +315,17 @@ export default function AdminPage() {
                 >
                   {p.done ? '완수' : '미이행'}
                 </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDeletePledge(p.id);
+                  }}
+                  className="px-2 py-1 bg-red-500/10 text-red-600 text-xs font-semibold rounded-md hover:bg-red-500/20 transition"
+                >
+                  삭제
+                </button>
               </span>
             </label>
           ))}
