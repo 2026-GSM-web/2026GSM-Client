@@ -17,8 +17,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/2026GSM
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             source ~/.nvm/nvm.sh
+            rm -rf .next
             npm install
             npm run build
-            pm2 restart gsm-web
+            pm2 restart gsm-web --update-env
