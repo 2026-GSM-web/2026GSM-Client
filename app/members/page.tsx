@@ -51,7 +51,7 @@ export default function MembersPage() {
   ];
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-12 space-y-8">
+    <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-12 space-y-8">
       <div>
         <h1 className="text-2xl font-bold">학생회 명단</h1>
       </div>

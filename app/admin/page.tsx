@@ -44,7 +44,7 @@ const defaultPledges: Pledge[] = [
 const STATUS_OPTIONS = ['대기중', '검토중', '시행완료'];
 
 const BTN_PRIMARY =
-  'bg-blue-600 dark:bg-blue-500 text-white font-semibold hover:bg-blue-700 dark:hover:bg-blue-400 transition';
+  'bg-blue-600 dark:bg-blue-500 text-white font-semibold hover:bg-blue-700 dark:hover:bg-blue-400 active:bg-blue-800 dark:active:bg-blue-600 active:scale-95 transition';
 const INPUT_CLASS =
   'w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-blue-600 dark:focus:outline-blue-400';
 
@@ -74,6 +74,14 @@ export default function AdminPage() {
     return [];
   });
 
+  const [progressPercent, setProgressPercent] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = localStorage.getItem('sc_progress_percent');
+    const parsed = saved ? Number(saved) : 0;
+    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
+  });
+  const [percentInput, setPercentInput] = useState(String(progressPercent));
+
   const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
 
   const VALID_CODES = ['gsm1!!', 'gsm2!!', 'gsm3!!'];
@@ -87,6 +95,14 @@ export default function AdminPage() {
   const saveIssues = (newIssues: Issue[]) => {
     setIssues(newIssues);
     localStorage.setItem('sc_issues', JSON.stringify(newIssues));
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleSavePercent = () => {
+    const value = Math.min(100, Math.max(0, Math.round(Number(percentInput) || 0)));
+    setProgressPercent(value);
+    setPercentInput(String(value));
+    localStorage.setItem('sc_progress_percent', String(value));
     window.dispatchEvent(new Event('storage'));
   };
 
@@ -178,7 +194,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-12 space-y-8">
+    <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-12 space-y-8">
       <div className="pb-4 border-b border-black/10 dark:border-white/10">
         <h1 className="text-2xl font-bold">🔒 관리자 대시보드</h1>
       </div>
@@ -210,8 +226,31 @@ export default function AdminPage() {
       </div>
 
       {activeTab === 'pledges' && (
-        <div className="space-y-3">
-          <p className="text-xs opacity-50">이행 체크를 하면 그 공약은 &apos;이행함&apos;으로 표시되고, 대시보드 이행률에 반영돼요.</p>
+        <div className="space-y-6">
+          <div className="p-4 border border-black/10 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5 space-y-2">
+            <span className="text-sm font-bold">정책 이행률 (%)</span>
+            <p className="text-xs opacity-50">대시보드에 표시될 전체 이행률을 직접 입력해 주세요.</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={percentInput}
+                onChange={(e) => setPercentInput(e.target.value)}
+                className={`${INPUT_CLASS} max-w-[100px]`}
+              />
+              <span className="text-sm opacity-50">%</span>
+              <button
+                onClick={handleSavePercent}
+                className={`px-4 py-2 text-xs rounded-lg ${BTN_PRIMARY}`}
+              >
+                저장
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+          <p className="text-xs opacity-50">이행 체크를 하면 그 공약이 &apos;완수&apos;로 표시되고, 대시보드의 완수 목록에 나타나요.</p>
           {pledges.map((p) => (
             <label
               key={p.id}
@@ -222,7 +261,7 @@ export default function AdminPage() {
                   type="checkbox"
                   checked={p.done}
                   onChange={() => handleTogglePledge(p.id)}
-                  className="w-4 h-4 shrink-0 accent-blue-600"
+                  className="w-3.5 h-3.5 shrink-0 accent-blue-600"
                 />
                 <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-black/30 dark:bg-white/30" />
                 <span className="font-bold text-sm truncate">{p.title}</span>
@@ -238,18 +277,19 @@ export default function AdminPage() {
                       : 'bg-black/5 dark:bg-white/10 opacity-50'
                   }`}
                 >
-                  {p.done ? '이행함' : '미이행'}
+                  {p.done ? '완수' : '미이행'}
                 </span>
               </span>
             </label>
           ))}
+          </div>
         </div>
       )}
 
       {activeTab === 'issues' && (
         <div className="space-y-6">
           {issues.length === 0 ? (
-            <div className="text-center py-12 text-sm opacity-50">등록된 이슈가 없습니다.</div>
+            <div className="min-h-[360px] flex items-center justify-center text-sm opacity-50">등록된 이슈가 없습니다.</div>
           ) : (
             issues.map((issue) => (
               <div key={issue.id} className="p-5 border border-black/10 dark:border-white/10 rounded-xl space-y-4 bg-white/70 dark:bg-white/5">
