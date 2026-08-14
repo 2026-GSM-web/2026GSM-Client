@@ -42,6 +42,13 @@ export default function MainPage() {
     return defaultPledges;
   });
 
+  const [progressPercent, setProgressPercent] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = localStorage.getItem('sc_progress_percent');
+    const parsed = saved ? Number(saved) : 0;
+    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
+  });
+
   const [ddayText, setDdayText] = useState<string>('');
 
   useEffect(() => {
@@ -50,6 +57,14 @@ export default function MainPage() {
       if (savedPledges) {
         const parsed = JSON.parse(savedPledges);
         if (isValidPledges(parsed)) setPledges(parsed);
+      }
+
+      const savedPercent = localStorage.getItem('sc_progress_percent');
+      if (savedPercent !== null) {
+        const parsedPercent = Number(savedPercent);
+        if (Number.isFinite(parsedPercent)) {
+          setProgressPercent(Math.min(100, Math.max(0, parsedPercent)));
+        }
       }
     };
 
@@ -73,14 +88,13 @@ export default function MainPage() {
     };
   }, []);
 
-  const doneCount = pledges.filter((p) => p.done).length;
-  const avgPercent = pledges.length > 0 ? Math.round((doneCount / pledges.length) * 100) : 0;
+  const completedPledges = pledges.filter((p) => p.done);
 
   const visibleMembers = MEMBER_NAMES.slice(0, 4);
   const remainingMembers = MEMBER_NAMES.length - visibleMembers.length;
 
   return (
-    <main className="max-w-5xl mx-auto px-6">
+    <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6">
       {/* 히어로 - D-day */}
       <section className="relative pt-20 pb-16 text-center overflow-hidden">
         <div
@@ -102,41 +116,40 @@ export default function MainPage() {
 
       {/* 대시보드 카드 그리드 */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-24">
-        {/* 정책 이행률 - 게이지바(전체 %)는 유지하고, 공약 하나가 이행될 때마다 1/N만큼 채워짐.
-            개별 공약은 퍼센트가 아니라 이행함/미이행(참/거짓)으로만 표시 - 전체 %가 어떤 공약들로 채워졌는지 아래 상세 목록으로 보여줌 */}
+        {/* 정책 이행률 - 퍼센트는 관리자가 직접 입력한 값. 상세 목록은 완수된 공약만 노출 */}
         <div className="md:col-span-2 p-6 border border-black/10 dark:border-white/10 rounded-2xl bg-white/40 dark:bg-white/5 transition-all duration-200 hover:shadow-lg hover:border-blue-600/30 dark:hover:border-blue-400/30">
           <span className="text-xs font-bold text-blue-600 dark:text-blue-400 tracking-widest uppercase">Policy Progress</span>
           <h2 className="text-base font-bold mt-1">정책 이행률</h2>
           <div className="flex items-baseline gap-2 mt-4">
-            <span className="text-2xl font-black tabular-nums">{avgPercent}%</span>
-            <span className="text-xs opacity-50">{doneCount} / {pledges.length} 완료</span>
+            <span className="text-2xl font-black tabular-nums">{progressPercent}%</span>
+            <span className="text-xs opacity-50">공약 {completedPledges.length}개 완수</span>
           </div>
           <div className="mt-4 h-1.5 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-blue-600 dark:bg-blue-500 rounded-full transition-all duration-300"
-              style={{ width: `${avgPercent}%` }}
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
 
-          {/* 상세 항목 - 어떤 공약이 이행됐는지/안됐는지만 표시 */}
-          <div className="mt-5 pt-4 border-t border-black/10 dark:border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
-            {pledges.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full shrink-0 bg-black/30 dark:bg-white/30" />
-                  <span className="text-sm truncate">{p.title}</span>
-                </span>
-                <span
-                  className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                    p.done
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-black/5 dark:bg-white/10 opacity-50'
-                  }`}
-                >
-                  {p.done ? '이행함' : '미이행'}
-                </span>
+          {/* 상세 항목 - 완수된 공약만 노출 */}
+          <div className="mt-5 pt-4 border-t border-black/10 dark:border-white/10">
+            {completedPledges.length === 0 ? (
+              <p className="text-sm opacity-50 text-center py-4">아직 완수된 공약이 없어요.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {completedPledges.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full shrink-0 bg-black/30 dark:bg-white/30" />
+                      <span className="text-sm truncate">{p.title}</span>
+                    </span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      완수
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
 

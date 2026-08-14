@@ -6,10 +6,10 @@ import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
 
 const NAV_ITEMS = [
-  { href: '/', label: '홈' },
-  { href: '/policies', label: '정책' },
-  { href: '/members', label: '학생회 인원' },
-  { href: '/admin', label: '관리자' },
+  { href: '/', label: '홈', shortLabel: '홈' },
+  { href: '/policies', label: '정책', shortLabel: '정책' },
+  { href: '/members', label: '학생회 인원', shortLabel: '인원' },
+  { href: '/admin', label: '관리자', shortLabel: '관리자' },
 ];
 
 export default function Header() {
@@ -33,25 +33,26 @@ export default function Header() {
 
   return (
     <header className="border-b border-black/10 dark:border-white/10 bg-white/80 dark:bg-black/60 backdrop-blur-md sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="font-bold text-lg tracking-tight">
+      <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <Link href="/" className="font-bold text-base sm:text-lg tracking-tight shrink-0 whitespace-nowrap">
           GSM 학생회
         </Link>
 
-        <nav className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium">
+        <nav className="flex items-center gap-0.5 sm:gap-2 text-xs sm:text-sm font-medium">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3 py-1.5 rounded-lg transition ${
+                className={`px-2 sm:px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
                   active
                     ? 'text-blue-600 dark:text-blue-400 font-semibold'
                     : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
               >
-                {item.label}
+                <span className="sm:hidden">{item.shortLabel}</span>
+                <span className="hidden sm:inline">{item.label}</span>
               </Link>
             );
           })}

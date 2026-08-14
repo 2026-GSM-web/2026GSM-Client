@@ -57,7 +57,15 @@ export default function PoliciesPage() {
 
       <div className="space-y-4">
         {issues.length === 0 ? (
-          <div className="text-center py-12 text-sm opacity-50">등록된 정책 제안이 없습니다.</div>
+          <div className="min-h-[360px] flex flex-col items-center justify-center gap-3 text-center">
+            <p className="text-sm opacity-50">등록된 정책 제안이 없습니다.</p>
+            <Link
+              href="/policies/create"
+              className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              첫 정책을 제안해 보세요 →
+            </Link>
+          </div>
         ) : (
           issues.map((issue) => (
             <Link
