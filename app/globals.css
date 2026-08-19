@@ -82,19 +82,32 @@ select:focus-visible {
 }
 
 /* 스크롤 트리거 애니메이션 - IntersectionObserver는 clip-path가 없는 .reveal
-   섹션 하나만 관찰하고, 뷰포트에 한 번 들어오면 .is-revealed를 붙임(그 뒤로는
-   CSS transition이 최종 상태까지 알아서 진행). 안쪽의 .reveal-heading/
-   .reveal-item은 별도로 관찰하지 않고 .reveal.is-revealed의 자식 선택자로
-   연쇄 트리거됨 - clip-path로 스스로를 0 너비까지 가려버리는 요소를 직접
-   IntersectionObserver 대상으로 삼으면, 가려진 영역이 0이라 "화면에 들어옴"
-   판정 자체가 절대 나지 않아 영원히 숨어있는 상태가 됨(공약 목록이 통째로
-   사라져 보이던 원인). 이전에는 스크롤 위치를 매 프레임 추적해서 clip-path를
-   직접 계산했는데, 그 방식도 사용자가 정확한 스크롤 구간을 통과하지 않고
-   멈추면 중간에 잘린 채로 멈춰버리는 문제가 있었음 */
+   섹션 하나만 관찰하고, 뷰포트에 처음 들어오는 순간 .is-revealed를 붙인 뒤
+   unobserve함(한 번 본 섹션은 스크롤을 올렸다 내려도 다시 재생되지 않음).
+   안쪽의 .reveal-heading/.reveal-item은 별도로 관찰하지 않고
+   .reveal.is-revealed의 자식 선택자로 연쇄 트리거됨 - clip-path로 스스로를
+   0 너비까지 가려버리는 요소를 직접 IntersectionObserver 대상으로 삼으면,
+   가려진 영역이 0이라 "화면에 들어옴" 판정 자체가 절대 나지 않아 영원히
+   숨어있는 상태가 됨(공약 목록이 통째로 사라져 보이던 원인). 이전에는
+   스크롤 위치를 매 프레임 추적해서 clip-path를 직접 계산했는데, 그 방식도
+   사용자가 정확한 스크롤 구간을 통과하지 않고 멈추면 중간에 잘린 채로
+   멈춰버리는 문제가 있었음 */
 .reveal {
   opacity: 0;
-  transform: translateY(32px);
-  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  transform: translateY(48px);
+  /* cubic-bezier(0, 0, 0.2, 1) - 처음부터 끝까지 가속 구간 없이 쭉 감속만
+     하는 커브라 "부드럽게 멈춘다"는 느낌이 제일 잘 남. 이동 거리(32→48px)와
+     지속시간을 늘려서 감속 구간이 눈에 더 오래 머무르게 함 */
+  transition: opacity 1.3s cubic-bezier(0, 0, 0.2, 1), transform 1.3s cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* 공약 목록처럼 안쪽 .reveal-item이 자기만의 좌→우 스냅 연출을 갖는
+   섹션은, 부모의 큰 페이드업 슬라이드가 그 스냅을 가려버려서 부모 쪽
+   모션을 꺼서(항상 보이는 상태) 항목별 스냅만 도드라지게 함 */
+.reveal.reveal-flat {
+  opacity: 1;
+  transform: none;
+  transition: none;
 }
 
 .reveal.is-revealed {
@@ -104,21 +117,29 @@ select:focus-visible {
 
 .reveal-heading {
   clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.6s ease-out;
+  transition: clip-path 1.3s cubic-bezier(0, 0, 0.2, 1);
 }
 
 .reveal.is-revealed .reveal-heading {
   clip-path: inset(0 0% 0 0);
 }
 
-/* 목록 항목 하나하나가 좌→우로 개별적으로 드러남. 각 항목의 transition-delay는
-   JSX에서 인덱스 기반으로 지정해서(styled inline) 순차적으로 나타나는
-   웨이브 효과를 냄 */
+/* 목록 항목이 한 줄씩 순서대로 "팍 팍 팍" 스냅하며 드러남 - 다른 .reveal
+   계열의 느긋한 감속과 달리 순간적으로 튀어나오는 느낌이 목적이라
+   지속시간을 짧게 두고, 항목 간 순차 텀은 JSX의 인덱스 기반
+   transitionDelay(styled inline)로 줌 */
 .reveal-item {
   clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.5s ease-out;
+  transition: clip-path 0.6s ease-out;
 }
 
 .reveal.is-revealed .reveal-item {
   clip-path: inset(0 0% 0 0);
 }
+
+/* 정책 제안 CTA 배너처럼 heading/item 웨이브 없이 섹션 통째로만 페이드인
+   되는 곳은 기본 1.3s가 다소 늘어져 보여서 살짝 더 빠르게 */
+.reveal.reveal-brief {
+  transition-duration: 0.8s;
+}
+

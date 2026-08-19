@@ -39,10 +39,10 @@ const VICE_PRESIDENTS = [
 const DEPARTMENTS = [
   { dept: '복지부', head: '정윤서', sub: '이다원' },
   { dept: '전공부', head: '정연돈', sub: '임서하' },
-  { dept: '행기부', head: '이찬진', sub: '최형지' },
-  { dept: '정통부', head: '정수진', sub: '이시우' },
-  { dept: '문체부', head: '이진서', sub: '김민욱' },
-  { dept: '생안부', head: '양은준', sub: '김승우' },
+  { dept: '행사기획부', head: '이찬진', sub: '최형지' },
+  { dept: '정보통신부', head: '정수진', sub: '이시우' },
+  { dept: '문화체육부', head: '이진서', sub: '김민욱' },
+  { dept: '학생생활안전부', head: '양은준', sub: '김승우' },
   { dept: '방송부', head: '김민선', sub: '송건호' },
 ];
 
@@ -107,14 +107,13 @@ export default function MainPage() {
   }, []);
 
   // 스크롤 트리거 애니메이션 - clip-path가 없는 .reveal 섹션만 관찰하고,
-  // 뷰포트에 들어오면 .is-revealed를 붙이고 벗어나면 다시 뗌(unobserve하지
-  // 않음) - 위로 올렸다가 다시 내려도 매번 다시 재생되게 함. 안쪽의
-  // .reveal-heading/.reveal-item은 CSS 자식 선택자로 연쇄 반응해서 같이
-  // 드러남 - clip-path로 스스로를 가리는 요소를 직접 관찰 대상으로 삼으면
-  // "화면에 들어옴" 판정 자체가 나지 않아 영영 숨어있게 됨(공약 목록이
-  // 통째로 사라져 보이던 원인). 스크롤 위치를 매 프레임 추적해서 clip-path를
-  // 계속 다시 계산하던 이전 방식도, 사용자가 정확한 스크롤 구간 안에서
-  // 멈추지 않으면 중간에 잘린 채로 멈춰버리는 문제가 있었음
+  // 뷰포트에 처음 들어오는 순간 .is-revealed를 붙인 뒤 바로 unobserve함
+  // (한 번 본 섹션은 스크롤을 올렸다 내려도 다시 재생되지 않음 - 반복
+  // 재생은 다시 읽으려 위로 스크롤할 때마다 내용이 사라졌다 나타나서
+  // 오히려 방해가 됨). 안쪽의 .reveal-heading/.reveal-item은 CSS 자식
+  // 선택자로 연쇄 반응해서 같이 드러남 - clip-path로 스스로를 가리는
+  // 요소를 직접 관찰 대상으로 삼으면 "화면에 들어옴" 판정 자체가 나지
+  // 않아 영영 숨어있게 됨(공약 목록이 통째로 사라져 보이던 원인)
   useEffect(() => {
     const sections = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
     if (sections.length === 0) return;
@@ -122,7 +121,9 @@ export default function MainPage() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          entry.target.classList.toggle('is-revealed', entry.isIntersecting);
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-revealed');
+          observer.unobserve(entry.target);
         });
       },
       { threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
@@ -191,13 +192,13 @@ export default function MainPage() {
         <span className="text-xs font-bold text-navy/70 dark:text-blue-400 tracking-[0.2em] uppercase">
           소개
         </span>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8 mt-4">
           <h2 className="reveal-heading text-2xl sm:text-3xl font-black leading-snug">
             안녕하십니까,
             <br />
             2026학년도 GSM 학생회 회장단입니다
           </h2>
-          <div className="space-y-4 text-sm sm:text-base opacity-80 leading-relaxed">
+          <div className="space-y-4 text-sm sm:text-base opacity-80 leading-relaxed lg:pl-8 lg:border-l lg:border-black/10 dark:lg:border-white/10">
             <p>
               학생회는 학생을 대신해 말하는 조직이 아니라, 학생이 직접 말할 수 있는 통로를
               만드는 조직이라고 생각합니다. 그래서 저희는 새로운 행사를 늘리는 일보다, 이미
@@ -228,7 +229,7 @@ export default function MainPage() {
       </section>
 
       {/* 공약 이행 현황 */}
-      <section id="pledges" className="reveal scroll-mt-16 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-20">
+      <section id="pledges" className="reveal reveal-flat scroll-mt-16 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-20">
         <span className="text-xs font-bold text-navy/70 dark:text-blue-400 tracking-[0.2em] uppercase">
           이행 현황
         </span>
@@ -260,7 +261,7 @@ export default function MainPage() {
             <div
               key={p.id}
               className="reveal-item flex items-center justify-between gap-4 py-4"
-              style={{ transitionDelay: `${Math.min(idx, 6) * 60}ms` }}
+              style={{ transitionDelay: `${Math.min(idx, 8) * 160}ms` }}
             >
               <div className="flex items-baseline gap-4 min-w-0">
                 <span className="text-xs opacity-40 shrink-0 tabular-nums">
@@ -287,7 +288,7 @@ export default function MainPage() {
         <h2 className="reveal-heading text-2xl sm:text-3xl font-black mt-4">학생회 조직 구성</h2>
 
         <div className="flex flex-col items-center mt-8">
-          <div className="navy-surface text-white px-8 py-4 text-center shadow-sm">
+          <div className="navy-surface text-white px-8 py-4 text-center shadow-sm rounded-md">
             <div className="font-bold text-sm">{PRESIDENT.role}</div>
             <div className="text-xs text-white/70 mt-1">{PRESIDENT.name}</div>
           </div>
@@ -302,7 +303,7 @@ export default function MainPage() {
             {VICE_PRESIDENTS.map((vp) => (
               <div
                 key={vp.name}
-                className="navy-surface text-white px-6 py-3 text-center shadow-sm"
+                className="navy-surface text-white px-6 py-3 text-center shadow-sm rounded-md"
               >
                 <div className="font-bold text-sm">{vp.role}</div>
                 <div className="text-xs text-white/70 mt-1">{vp.name}</div>
@@ -315,7 +316,7 @@ export default function MainPage() {
           {DEPARTMENTS.map((d) => (
             <div
               key={d.dept}
-              className="p-4 border border-black/10 dark:border-white/10 text-center bg-white/70 dark:bg-white/5 transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-navy/30 dark:hover:border-blue-400/40"
+              className="p-4 rounded-md border border-black/10 dark:border-white/10 text-center bg-white/70 dark:bg-white/5 transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-navy/30 dark:hover:border-blue-400/40"
             >
               <div className="font-bold text-sm">{d.dept}</div>
               <div className="text-xs opacity-60 mt-2">{d.head} 부장</div>
@@ -326,7 +327,7 @@ export default function MainPage() {
       </section>
 
       {/* 정책 제안 CTA */}
-      <section className="reveal max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 pb-12">
+      <section className="reveal reveal-brief max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 pb-12">
         <div className="rounded-2xl navy-surface text-white px-8 py-8 text-center sm:text-left sm:flex sm:items-center sm:justify-between gap-6">
           <div>
             <h3 className="text-xl font-bold">학생회에 바라는 점이 있나요?</h3>

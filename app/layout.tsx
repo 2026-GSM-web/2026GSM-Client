@@ -4,17 +4,15 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Providers from './provider';
 
-// 본문 전체 폰트
-const nanumSquareNeo = localFont({
-  src: [
-    { path: './fonts/NanumSquareNeo-Light.woff2', weight: '300', style: 'normal' },
-    { path: './fonts/NanumSquareNeo-Regular.woff2', weight: '400', style: 'normal' },
-    { path: './fonts/NanumSquareNeo-Bold.woff2', weight: '700', style: 'normal' },
-    { path: './fonts/NanumSquareNeo-ExtraBold.woff2', weight: '800', style: 'normal' },
-    { path: './fonts/NanumSquareNeo-Heavy.woff2', weight: '900', style: 'normal' },
-  ],
+// 본문 전체 폰트 - Pretendard 가변 폰트(1개 파일이 45~920 전체 굵기 범위를
+// 커버). 이전 NanumSquareNeo는 300/400/700/800/900 다섯 개의 정적 굵기만
+// 있어서 Tailwind의 font-medium(500)/font-semibold(600) 같은 클래스가
+// 실제로 대응하는 파일 없이 렌더링됐는데, 가변 폰트라 이제 모든 굵기가
+// 정확히 표현됨
+const pretendard = localFont({
+  src: './fonts/PretendardVariable.woff2',
   display: 'swap',
-  variable: '--font-nanumsquareneo',
+  variable: '--font-pretendard',
 });
 
 export default function RootLayout({
@@ -23,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" suppressHydrationWarning className={nanumSquareNeo.variable}>
-      <body className="font-[family-name:var(--font-nanumsquareneo)] min-h-screen flex flex-col">
+    <html lang="ko" suppressHydrationWarning className={pretendard.variable}>
+      <body className="font-[family-name:var(--font-pretendard)] min-h-screen flex flex-col">
         <Providers>
           <Header />
           {/* 콘텐츠가 짧아도 푸터가 화면 중간에 뜨지 않고 항상 맨 아래에 붙도록.

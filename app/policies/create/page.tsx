@@ -114,7 +114,7 @@ export default function CreatePolicyPage() {
                   '문화체육부',
                   '정보통신부',
                   '방송부',
-                  '행가기획부',
+                  '행사기획부',
                 ].map((d) => (
                   <option key={d} value={d} className="dark:bg-zinc-800">
                     {d}
