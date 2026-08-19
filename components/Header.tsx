@@ -55,6 +55,11 @@ export default function Header() {
   // 스크롤해서 히어로를 벗어났고, 라이트 모드일 때만 흰 바탕(+어두운 글씨)
   const lightHeader = !overHero && mounted && !isDark;
 
+  // 히어로를 벗어났는지 여부 - 테마와 무관하게 건의하기 버튼 색 전환에 사용.
+  // (헤더 배경 자체는 라이트일 때만 흰색이지만, 다크 모드에서도 스크롤하면
+  // navy-surface 다크 배경으로 바뀌므로 버튼도 함께 반응해야 함)
+  const scrolled = !overHero && mounted;
+
   // 평소엔 배경 없이 텍스트만, 마우스를 올리면 배경이 나타남
   const linkClass = `px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition whitespace-nowrap ${
     lightHeader
@@ -136,8 +141,8 @@ export default function Header() {
           <Link
             href="/policies/create"
             className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
-              lightHeader
-                ? 'navy-surface text-white hover:brightness-110'
+              scrolled
+                ? 'bg-navy text-white dark:bg-[#1d4e74] dark:text-white hover:brightness-110'
                 : 'bg-white text-navy dark:text-[#171b23] hover:bg-white/90'
             }`}
           >

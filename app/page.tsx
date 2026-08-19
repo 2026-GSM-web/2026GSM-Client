@@ -45,6 +45,8 @@ const DEPARTMENTS = [
   { dept: '학생생활안전부', head: '양은준', sub: '김승우' },
   { dept: '방송부', head: '김민선', sub: '송건호' },
 ];
+// 회장 1명 + 부회장 N명 + 부서별 부장/차장 2명씩
+const totalMemberCount = 1 + VICE_PRESIDENTS.length + DEPARTMENTS.length * 2;
 
 export default function MainPage() {
   const [pledges, setPledges] = useState<Pledge[]>(() => {
@@ -212,8 +214,8 @@ export default function MainPage() {
 
             <div className="grid grid-cols-3 gap-6 pt-6 mt-2 border-t border-black/10 dark:border-white/10">
               <div>
-                <div className="text-xs opacity-50">재학생</div>
-                <div className="text-sm font-bold mt-1">1,024명</div>
+                <div className="text-xs opacity-50">학생회 인원</div>
+                <div className="text-sm font-bold mt-1">{totalMemberCount}명</div>
               </div>
               <div>
                 <div className="text-xs opacity-50">학생회 부서</div>
