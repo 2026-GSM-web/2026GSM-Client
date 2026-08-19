@@ -17,14 +17,13 @@ export default function PolicyDetailError({
   return (
     <main className="min-h-[70vh] flex items-center justify-center px-4">
       <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-4 text-center bg-white/70 dark:bg-white/5">
-        <span className="text-3xl block">📄</span>
         <h1 className="text-lg font-bold">정책 상세 정보를 불러오지 못했습니다</h1>
         <p className="text-sm opacity-60">삭제되었거나 일시적인 오류일 수 있어요.</p>
         <div className="flex flex-col gap-2 pt-1">
           <button
             type="button"
             onClick={() => unstable_retry()}
-            className="w-full py-2.5 bg-blue-600 dark:bg-blue-500 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 dark:hover:bg-blue-400 transition"
+            className="w-full py-2.5 navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold text-sm rounded-lg hover:brightness-110 dark:hover:bg-blue-400 transition"
           >
             다시 시도
           </button>

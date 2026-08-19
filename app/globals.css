@@ -3,15 +3,37 @@
 /* vscode-css-ignore-start */
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --color-navy: #4682b4;
+  --color-navy-light: #6fa8d1;
+}
+
+/* 헤더/푸터/카드 등 큼직한 포인트 컬러 면에 쓰는 배경 - 단일 flat 색상 */
+.navy-surface {
+  background: #4682b4;
+}
+
+/* 다크모드에서는 라이트 모드와 같은 선명한 스틸블루를 그대로 쓰면 어두운
+   배경 위에서 튀어 보여서, 채도를 낮추고 배경 톤에 맞춰 살짝 더 어둡게 */
+.dark .navy-surface {
+  background: #24394b;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: linear-gradient(160deg, #eef4f8 0%, #e9efe9 55%, #e3ece4 100%);
-  color: #0f172a;
+  background: #f0f7fb;
+  color: #000000;
   transition-property: color, background-color;
   transition-duration: 200ms;
 }
 
 .dark body {
-  background: #06070a;
+  /* 무채색 회색 대신 네이비 톤을 살짝 머금은 다크 그레이 - 헤더/카드에 쓰이는
+     navy-surface와 같은 계열이라 배경과 면(surface)이 붕 뜨지 않고 이어져 보임 */
+  background: #171b23;
   color: #e2e8f0;
 }
 
@@ -20,11 +42,83 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: none;
 }
 
-.dark :focus-visible {
-  outline-color: #60a5fa;
+/* 입력창 포커스 - 테두리 대신 살짝 확대되는 느낌 */
+input,
+textarea,
+select {
+  transition: transform 0.15s ease;
+  transform-origin: center;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  transform: scale(1.02);
+}
+
+/* 히어로 배경 사진 - 아주 느린 켄 번즈 줌 */
+@keyframes hero-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+/* 히어로 텍스트 - 아래에서 살짝 올라오며 페이드인 */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 스크롤 트리거 애니메이션 - IntersectionObserver는 clip-path가 없는 .reveal
+   섹션 하나만 관찰하고, 뷰포트에 한 번 들어오면 .is-revealed를 붙임(그 뒤로는
+   CSS transition이 최종 상태까지 알아서 진행). 안쪽의 .reveal-heading/
+   .reveal-item은 별도로 관찰하지 않고 .reveal.is-revealed의 자식 선택자로
+   연쇄 트리거됨 - clip-path로 스스로를 0 너비까지 가려버리는 요소를 직접
+   IntersectionObserver 대상으로 삼으면, 가려진 영역이 0이라 "화면에 들어옴"
+   판정 자체가 절대 나지 않아 영원히 숨어있는 상태가 됨(공약 목록이 통째로
+   사라져 보이던 원인). 이전에는 스크롤 위치를 매 프레임 추적해서 clip-path를
+   직접 계산했는데, 그 방식도 사용자가 정확한 스크롤 구간을 통과하지 않고
+   멈추면 중간에 잘린 채로 멈춰버리는 문제가 있었음 */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.reveal.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-heading {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.6s ease-out;
+}
+
+.reveal.is-revealed .reveal-heading {
+  clip-path: inset(0 0% 0 0);
+}
+
+/* 목록 항목 하나하나가 좌→우로 개별적으로 드러남. 각 항목의 transition-delay는
+   JSX에서 인덱스 기반으로 지정해서(styled inline) 순차적으로 나타나는
+   웨이브 효과를 냄 */
+.reveal-item {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.5s ease-out;
+}
+
+.reveal.is-revealed .reveal-item {
+  clip-path: inset(0 0% 0 0);
 }

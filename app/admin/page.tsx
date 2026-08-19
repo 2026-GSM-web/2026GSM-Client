@@ -2,13 +2,16 @@
 
 import { useState } from 'react';
 
+type PledgeStatus = '진행 중' | '시범 운영 중' | '완료';
+
 interface Pledge {
   id: string;
   title: string;
-  color: string;
-  done: boolean;
-  completedAt?: string;
+  subStatus: string;
+  status: PledgeStatus;
 }
+
+const STATUS_VALUES: PledgeStatus[] = ['진행 중', '시범 운영 중', '완료'];
 
 interface Comment {
   id: number;
@@ -28,25 +31,28 @@ interface Issue {
   comments: Comment[];
 }
 
-// localStorage에 예전 방식(percent/items 기반)의 데이터가 남아있을 수 있어
-// done 값을 갖춘 유효한 형태인지 확인 후, 아니면 기본값으로 대체
+// localStorage에 예전 방식(done boolean 기반)의 데이터가 남아있을 수 있어
+// status 값을 갖춘 유효한 형태인지 확인 후, 아니면 기본값으로 대체
 function isValidPledges(data: unknown): data is Pledge[] {
-  return Array.isArray(data) && data.every((p) => p && typeof p.done === 'boolean');
+  return (
+    Array.isArray(data) &&
+    data.every((p) => p && typeof p.title === 'string' && STATUS_VALUES.includes(p.status))
+  );
 }
 
 const defaultPledges: Pledge[] = [
-  { id: 'p1', title: 'AI 프로 지원', color: '#3b82f6', done: false },
-  { id: 'p2', title: '전공 동아리 활성화', color: '#10b981', done: false },
-  { id: 'p3', title: '교내 대회 개최', color: '#f59e0b', done: false },
-  { id: 'p4', title: '지필평가 금요일로 변경', color: '#8b5cf6', done: false },
+  { id: 'p1', title: 'AI 프로 지원', subStatus: '', status: '진행 중' },
+  { id: 'p2', title: '전공 동아리 활성화', subStatus: '', status: '진행 중' },
+  { id: 'p3', title: '교내 대회 개최', subStatus: '', status: '진행 중' },
+  { id: 'p4', title: '지필평가 금요일로 변경', subStatus: '', status: '진행 중' },
 ];
 
 const STATUS_OPTIONS = ['대기중', '검토중', '시행완료'];
 
 const BTN_PRIMARY =
-  'bg-blue-600 dark:bg-blue-500 text-white font-semibold hover:bg-blue-700 dark:hover:bg-blue-400 active:bg-blue-800 dark:active:bg-blue-600 active:scale-95 transition';
+  'navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold hover:brightness-110 dark:hover:bg-blue-400 active:brightness-90 active:scale-95 transition';
 const INPUT_CLASS =
-  'w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-blue-600 dark:focus:outline-blue-400';
+  'w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -82,8 +88,6 @@ export default function AdminPage() {
   });
   const [percentInput, setPercentInput] = useState(String(progressPercent));
 
-  const [newPledgeTitle, setNewPledgeTitle] = useState('');
-
   const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
 
   const VALID_CODES = ['gsm1!!', 'gsm2!!', 'gsm3!!'];
@@ -108,21 +112,6 @@ export default function AdminPage() {
     window.dispatchEvent(new Event('storage'));
   };
 
-  const handleAddPledge = (e: React.FormEvent) => {
-    e.preventDefault();
-    const title = newPledgeTitle.trim();
-    if (!title) return alert('공약 내용을 입력해 주세요.');
-
-    const newPledge: Pledge = {
-      id: `p${Date.now()}`,
-      title,
-      color: '#3b82f6',
-      done: false,
-    };
-    savePledges([...pledges, newPledge]);
-    setNewPledgeTitle('');
-  };
-
   const handleDeletePledge = (pledgeId: string) => {
     if (confirm('이 공약을 삭제하시겠습니까?')) {
       savePledges(pledges.filter((p) => p.id !== pledgeId));
@@ -130,23 +119,24 @@ export default function AdminPage() {
   };
 
   const handleResetPledges = () => {
-    if (confirm('모든 공약을 이행 전 상태로 초기화하시겠습니까?')) {
-      const resetPledges = pledges.map((p) => ({ ...p, done: false, completedAt: undefined }));
+    if (confirm('모든 공약을 \'진행 중\' 상태로 초기화하시겠습니까?')) {
+      const resetPledges = pledges.map((p) => ({ ...p, status: '진행 중' as PledgeStatus, subStatus: '' }));
       savePledges(resetPledges);
       alert('공약 진행 상황이 초기화되었습니다.');
     }
   };
 
-  const handleTogglePledge = (pledgeId: string) => {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+  const handleUpdatePledgeStatus = (pledgeId: string, status: PledgeStatus) => {
+    savePledges(pledges.map((p) => (p.id === pledgeId ? { ...p, status } : p)));
+  };
 
-    const updated = pledges.map((p) =>
-      p.id === pledgeId
-        ? { ...p, done: !p.done, completedAt: !p.done ? today : undefined }
-        : p
-    );
+  const handleUpdatePledgeSubStatus = (pledgeId: string, subStatus: string) => {
+    setPledges(pledges.map((p) => (p.id === pledgeId ? { ...p, subStatus } : p)));
+  };
 
-    savePledges(updated);
+  const handleBlurPledgeSubStatus = () => {
+    localStorage.setItem('sc_pledges', JSON.stringify(pledges));
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleDeleteIssue = (id: string) => {
@@ -195,8 +185,8 @@ export default function AdminPage() {
     return (
       <main className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
-          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 tracking-wider">ADMIN ACCESS</span>
-          <h1 className="text-xl font-bold mt-1">관리자 인증</h1>
+          <h1 className="text-xl font-bold">관리자 인증</h1>
+          <p className="text-xs opacity-50">학생회 관리자만 접근할 수 있는 페이지입니다.</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="password"
@@ -217,22 +207,22 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-12 space-y-8">
+    <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 pt-12 pb-24 space-y-8">
       <div className="pb-4 border-b border-black/10 dark:border-white/10">
-        <h1 className="text-2xl font-bold">🔒 관리자 대시보드</h1>
+        <h1 className="text-2xl font-bold">관리자 대시보드</h1>
       </div>
 
       <div className="flex justify-between items-center border-b border-black/10 dark:border-white/10 pb-3 flex-wrap gap-3">
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setActiveTab('pledges')}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'pledges' ? 'bg-blue-600 dark:bg-blue-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'pledges' ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
           >
             공약 이행률
           </button>
           <button
             onClick={() => setActiveTab('issues')}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'issues' ? 'bg-blue-600 dark:bg-blue-500 text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'issues' ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
           >
             제안 및 답변 ({issues.length})
           </button>
@@ -272,62 +262,46 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <form onSubmit={handleAddPledge} className="flex gap-2">
-            <input
-              type="text"
-              placeholder="새 공약 내용을 입력하세요"
-              value={newPledgeTitle}
-              onChange={(e) => setNewPledgeTitle(e.target.value)}
-              className={INPUT_CLASS}
-            />
-            <button type="submit" className={`px-4 shrink-0 text-sm rounded-lg ${BTN_PRIMARY}`}>
-              추가
-            </button>
-          </form>
-
           <div className="space-y-3">
-          <p className="text-xs opacity-50">이행 체크를 하면 그 공약이 &apos;완수&apos;로 표시되고, 대시보드의 완수 목록에 나타나요.</p>
+          <p className="text-xs opacity-50">상태와 진행 상황 문구는 대시보드의 이행 현황 목록에 그대로 표시돼요.</p>
           {pledges.map((p) => (
-            <label
+            <div
               key={p.id}
-              className="flex items-center justify-between gap-3 p-4 border border-black/10 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5 cursor-pointer"
+              className="flex flex-col gap-3 p-4 border border-black/10 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5"
             >
-              <span className="flex items-center gap-3 min-w-0">
+              <span className="font-bold text-sm">{p.title}</span>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <input
-                  type="checkbox"
-                  checked={p.done}
-                  onChange={() => handleTogglePledge(p.id)}
-                  className="w-3.5 h-3.5 shrink-0 accent-blue-600"
+                  type="text"
+                  placeholder="진행 상황 (예: 3월 시행 완료)"
+                  value={p.subStatus}
+                  onChange={(e) => handleUpdatePledgeSubStatus(p.id, e.target.value)}
+                  onBlur={handleBlurPledgeSubStatus}
+                  className={`${INPUT_CLASS} sm:flex-1`}
                 />
-                <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-black/30 dark:bg-white/30" />
-                <span className="font-bold text-sm truncate">{p.title}</span>
-              </span>
-              <span className="flex items-center gap-3 shrink-0">
-                {p.done && p.completedAt && (
-                  <span className="text-xs opacity-40">{p.completedAt}</span>
-                )}
-                <span
-                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    p.done
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-black/5 dark:bg-white/10 opacity-50'
-                  }`}
+
+                <select
+                  value={p.status}
+                  onChange={(e) => handleUpdatePledgeStatus(p.id, e.target.value as PledgeStatus)}
+                  className="p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400 shrink-0"
                 >
-                  {p.done ? '완수' : '미이행'}
-                </span>
+                  {STATUS_VALUES.map((status) => (
+                    <option key={status} value={status} className="text-black">
+                      {status}
+                    </option>
+                  ))}
+                </select>
+
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleDeletePledge(p.id);
-                  }}
-                  className="px-2 py-1 bg-red-500/10 text-red-600 text-xs font-semibold rounded-md hover:bg-red-500/20 transition"
+                  onClick={() => handleDeletePledge(p.id)}
+                  className="px-2 py-1 bg-red-500/10 text-red-600 text-xs font-semibold rounded-md hover:bg-red-500/20 transition shrink-0"
                 >
                   삭제
                 </button>
-              </span>
-            </label>
+              </div>
+            </div>
           ))}
           </div>
         </div>
@@ -362,7 +336,7 @@ export default function AdminPage() {
                     {issue.comments.map((c) => (
                       <div key={c.id} className="p-3 bg-white/70 dark:bg-white/5 rounded-lg text-xs space-y-1">
                         <div className="flex justify-between font-bold">
-                          <span className="text-blue-600 dark:text-blue-400">{c.author}</span>
+                          <span className="text-navy dark:text-blue-400">{c.author}</span>
                           <span className="opacity-40">{c.date}</span>
                         </div>
                         <p>{c.text}</p>
@@ -395,7 +369,7 @@ export default function AdminPage() {
                       onClick={() => handleUpdateStatus(issue.id, status)}
                       className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
                         issue.status === status
-                          ? 'bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500 shadow-sm'
+                          ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white border-transparent dark:border-blue-500 shadow-sm'
                           : 'border-black/20 dark:border-white/20 hover:bg-black/5 opacity-70'
                       }`}
                     >

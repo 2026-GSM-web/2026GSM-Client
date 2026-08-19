@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useOAuth } from '@themoment-team/datagsm-oauth-react';
 
@@ -13,18 +13,71 @@ const ERROR_MESSAGES: Record<string, string> = {
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useOAuth();
+  const { login, redirectUri, getCodeVerifier, clearVerifier } = useOAuth();
 
-  const error = searchParams.get('error');
+  const oauthError = searchParams.get('error');
+  const code = searchParams.get('code');
+
+  const [exchangeError, setExchangeError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (error) return;
-    // 로그인 성공 시 작성 페이지로 로그인 상태값과 함께 이동
-    router.replace('/policies/create?isLoggedIn=true');
-  }, [error, router]);
+    if (oauthError) return;
+
+    const exchangeCode = async () => {
+      if (!code) {
+        setExchangeError('인증 코드를 받지 못했습니다. 다시 로그인해 주세요.');
+        return;
+      }
+
+      const apiBaseUrl = process.env.NEXT_PUBLIC_AUTH_API_URL;
+      if (!apiBaseUrl) {
+        // 백엔드 주소가 아직 설정되지 않음 - .env.example 참고
+        setExchangeError('로그인 서버 주소가 설정되지 않았습니다. 관리자에게 문의해 주세요.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            authCode: code,
+            redirectUri,
+            codeVerifier: getCodeVerifier(),
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`서버 응답 오류 (${res.status})`);
+        }
+
+        const data = await res.json();
+        const token = data.jwt ?? data.token ?? data.accessToken;
+        if (!token) {
+          throw new Error('응답에서 JWT를 찾을 수 없습니다.');
+        }
+
+        localStorage.setItem('sc_jwt', token);
+        clearVerifier();
+
+        // 로그인 성공 시 작성 페이지로 로그인 상태값과 함께 이동
+        router.replace('/policies/create?isLoggedIn=true');
+      } catch (err) {
+        setExchangeError(
+          err instanceof Error ? err.message : '로그인 처리 중 알 수 없는 오류가 발생했습니다.'
+        );
+      }
+    };
+
+    exchangeCode();
+  }, [oauthError, code, redirectUri, getCodeVerifier, clearVerifier, router]);
+
+  const error = oauthError ?? (exchangeError ? 'EXCHANGE_FAILED' : null);
 
   if (error) {
-    const message = ERROR_MESSAGES[error] || `로그인 중 오류가 발생했습니다. (${error})`;
+    const message = oauthError
+      ? ERROR_MESSAGES[oauthError] || `로그인 중 오류가 발생했습니다. (${oauthError})`
+      : exchangeError!;
 
     return (
       <main className="min-h-screen flex items-center justify-center px-4">
@@ -32,12 +85,12 @@ function CallbackContent() {
           <span className="text-xs font-bold text-red-500 tracking-wider">LOGIN FAILED</span>
           <h1 className="text-xl font-bold">로그인에 실패했습니다</h1>
           <p className="text-sm opacity-70 leading-relaxed">{message}</p>
-          <p className="text-[11px] opacity-40 font-mono break-all">{error}</p>
+          {oauthError && <p className="text-[11px] opacity-40 font-mono break-all">{oauthError}</p>}
           <div className="flex flex-col gap-2 pt-2">
             <button
               type="button"
               onClick={() => login()}
-              className="w-full py-2.5 bg-blue-600 dark:bg-blue-500 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 dark:hover:bg-blue-400 transition"
+              className="w-full py-2.5 navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold text-sm rounded-lg hover:brightness-110 dark:hover:bg-blue-400 transition"
             >
               다시 로그인하기
             </button>
