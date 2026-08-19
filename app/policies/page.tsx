@@ -44,12 +44,12 @@ export default function PoliciesPage() {
     <main className="max-w-4xl mx-auto px-6 py-12 space-y-6">
       <div className="flex justify-between items-end border-b border-black/10 dark:border-white/10 pb-4">
         <div>
-          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 tracking-wider">VOICE</span>
-          <h1 className="text-2xl font-bold mt-1">정책 제안 게시판</h1>
+          <h1 className="text-2xl font-bold">정책 제안 게시판</h1>
+          <p className="text-xs opacity-50 mt-1">학생들이 남긴 제안과 학생회의 답변을 확인할 수 있어요.</p>
         </div>
         <Link
           href="/policies/create"
-          className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white font-semibold text-xs rounded-lg hover:bg-blue-700 dark:hover:bg-blue-400 transition"
+          className="px-4 py-2 navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold text-xs rounded-lg hover:brightness-110 dark:hover:bg-blue-400 transition"
         >
           + 정책 제안하기
         </Link>
@@ -61,7 +61,7 @@ export default function PoliciesPage() {
             <p className="text-sm opacity-50">등록된 정책 제안이 없습니다.</p>
             <Link
               href="/policies/create"
-              className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-sm font-semibold text-navy dark:text-blue-400 hover:underline"
             >
               첫 정책을 제안해 보세요 →
             </Link>
@@ -71,7 +71,7 @@ export default function PoliciesPage() {
             <Link
               key={issue.id}
               href={`/policies/${issue.id}`}
-              className="block p-5 border border-black/10 dark:border-white/10 rounded-xl hover:border-blue-600/50 dark:hover:border-blue-400/50 transition bg-white/70 dark:bg-white/5 space-y-2"
+              className="block p-5 border border-black/10 dark:border-white/10 rounded-xl hover:border-navy/50 dark:hover:border-blue-400/50 transition bg-white/70 dark:bg-white/5 space-y-2"
             >
               <div className="flex justify-between items-start">
                 <span
@@ -79,8 +79,8 @@ export default function PoliciesPage() {
                     issue.status === '시행완료'
                       ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
                       : issue.status === '검토중'
-                      ? 'bg-blue-500/10 text-blue-600 border-blue-500/30'
-                      : 'bg-blue-600/10 text-blue-600 border-blue-600/30 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/30'
+                      ? 'bg-navy/10 text-navy border-navy/30'
+                      : 'bg-navy/10 text-navy border-navy/30 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/30'
                   }`}
                 >
                   {issue.status}
