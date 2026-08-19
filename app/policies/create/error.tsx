@@ -27,8 +27,8 @@ export default function CreatePolicyError({
           >
             다시 시도
           </button>
-          <Link href="/policies" className="text-xs opacity-60 hover:opacity-100 transition">
-            목록으로 돌아가기
+          <Link href="/" className="text-xs opacity-60 hover:opacity-100 transition">
+            홈으로 돌아가기
           </Link>
         </div>
       </div>
