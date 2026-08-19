@@ -321,8 +321,8 @@ export default function MainPage() {
               className="p-4 rounded-md border border-black/10 dark:border-white/10 text-center bg-white/70 dark:bg-white/5 transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-navy/30 dark:hover:border-blue-400/40"
             >
               <div className="font-bold text-sm">{d.dept}</div>
-              <div className="text-xs opacity-60 mt-2">{d.head} 부장</div>
-              <div className="text-xs opacity-40 mt-0.5">{d.sub} 차장</div>
+              <div className="text-xs opacity-60 mt-2"> 부장 {d.head} </div>
+              <div className="text-xs opacity-40 mt-0.5"> 차장 {d.sub}</div>
             </div>
           ))}
         </div>
