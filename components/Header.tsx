@@ -136,7 +136,9 @@ export default function Header() {
           <Link
             href="/policies/create"
             className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
-              lightHeader ? 'navy-surface text-white hover:brightness-110' : 'bg-white text-navy hover:bg-white/90'
+              lightHeader
+                ? 'navy-surface text-white hover:brightness-110'
+                : 'bg-white text-navy dark:text-[#171b23] hover:bg-white/90'
             }`}
           >
             건의하기
