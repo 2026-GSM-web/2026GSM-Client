@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useOAuth } from '@themoment-team/datagsm-oauth-react';
 
 type PledgeStatus = '진행 중' | '시범 운영 중' | '완료';
 
@@ -55,9 +57,14 @@ const INPUT_CLASS =
   'w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400';
 
 export default function AdminPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [accessCode, setAccessCode] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const searchParams = useSearchParams();
+  const { login } = useOAuth();
+
+  // DataGSM 계정 로그인 여부로만 접근을 판단함.
+  // TODO: 백엔드에 임원 승인 여부를 확인하는 엔드포인트가 생기면, 로그인 여부만이 아니라
+  // "로그인한 DataGSM 계정이 승인된 임원인지"까지 서버에 확인하도록 교체해야 함.
+  // 그 전까지는 DataGSM 계정만 있으면(=재학생 누구나) 이 페이지에 들어올 수 있음.
+  const isDataGsmLogged = searchParams.get('isLoggedIn') === 'true';
 
   const [activeTab, setActiveTab] = useState<'pledges' | 'issues'>('pledges');
 
@@ -89,8 +96,6 @@ export default function AdminPage() {
   const [percentInput, setPercentInput] = useState(String(progressPercent));
 
   const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
-
-  const VALID_CODES = ['gsm1!!', 'gsm2!!', 'gsm3!!'];
 
   const savePledges = (newPledges: Pledge[]) => {
     setPledges(newPledges);
@@ -170,37 +175,25 @@ export default function AdminPage() {
     saveIssues(issues.map((i) => (i.id === issueId ? { ...i, status: newStatus } : i)));
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (VALID_CODES.includes(accessCode.trim())) {
-      setIsLoggedIn(true);
-      setErrorMessage('');
-      setAccessCode('');
-    } else {
-      setErrorMessage('유효하지 않은 관리자 코드입니다.');
-    }
-  };
-
-  if (!isLoggedIn) {
+  // ------------------------------------------------------------- //
+  // DataGSM 로그인 전
+  // ------------------------------------------------------------- //
+  if (!isDataGsmLogged) {
     return (
       <main className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
           <h1 className="text-xl font-bold">관리자 인증</h1>
           <p className="text-xs opacity-50">학생회 관리자만 접근할 수 있는 페이지입니다.</p>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              placeholder="관리자 코드를 입력하세요"
-              className={INPUT_CLASS}
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              autoFocus
-            />
-            {errorMessage && <p className="text-xs text-red-500 font-medium">{errorMessage}</p>}
-            <button type="submit" className={`w-full py-2.5 text-sm rounded-lg ${BTN_PRIMARY}`}>
-              인증하고 들어가기
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.setItem('sc_oauth_return_to', '/admin');
+              login();
+            }}
+            className={`w-full py-3.5 text-sm rounded-xl ${BTN_PRIMARY}`}
+          >
+            DataGSM 계정으로 로그인하기
+          </button>
         </div>
       </main>
     );
