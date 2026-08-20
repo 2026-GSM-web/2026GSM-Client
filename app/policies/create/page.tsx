@@ -128,7 +128,10 @@ export default function CreatePolicyPage() {
             </p>
             <button
               type="button"
-              onClick={() => login()}
+              onClick={() => {
+                sessionStorage.setItem('sc_oauth_return_to', '/policies/create');
+                login();
+              }}
               className="w-full py-3.5 navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold text-sm rounded-xl hover:brightness-110 dark:hover:bg-blue-400 transition"
             >
               DataGSM 계정으로 로그인하기

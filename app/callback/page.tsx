@@ -60,8 +60,12 @@ function CallbackContent() {
         localStorage.setItem('sc_jwt', token);
         clearVerifier();
 
-        // 로그인 성공 시 작성 페이지로 로그인 상태값과 함께 이동
-        router.replace('/policies/create?isLoggedIn=true');
+        // 로그인을 어디서 시작했는지에 따라 되돌아갈 위치가 달라짐(정책 제안 작성 / 관리자
+        // 페이지 등). 로그인 시작 시 sessionStorage에 남겨둔 값을 읽고, 없으면 기존 기본
+        // 동작(정책 제안 작성 페이지)으로 이동
+        const returnTo = sessionStorage.getItem('sc_oauth_return_to') || '/policies/create';
+        sessionStorage.removeItem('sc_oauth_return_to');
+        router.replace(`${returnTo}?isLoggedIn=true`);
       } catch (err) {
         setExchangeError(
           err instanceof Error ? err.message : '로그인 처리 중 알 수 없는 오류가 발생했습니다.'
