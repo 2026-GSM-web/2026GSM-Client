@@ -2,33 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-
-type PledgeStatus = '진행 중' | '시범 운영 중' | '완료';
-
-interface Pledge {
-  id: string;
-  title: string;
-  subStatus: string;
-  status: PledgeStatus;
-}
-
-const STATUS_VALUES: PledgeStatus[] = ['진행 중', '시범 운영 중', '완료'];
-
-// localStorage에 예전 방식(done boolean 기반)의 데이터가 남아있을 수 있어
-// status 값을 갖춘 유효한 형태인지 확인 후, 아니면 기본값으로 대체
-function isValidPledges(data: unknown): data is Pledge[] {
-  return (
-    Array.isArray(data) &&
-    data.every((p) => p && typeof p.title === 'string' && STATUS_VALUES.includes(p.status))
-  );
-}
-
-const defaultPledges: Pledge[] = [
-  { id: 'p1', title: 'AI 프로 지원', subStatus: '', status: '진행 중' },
-  { id: 'p2', title: '전공 동아리 활성화', subStatus: '', status: '진행 중' },
-  { id: 'p3', title: '교내 대회 개최', subStatus: '', status: '진행 중' },
-  { id: 'p4', title: '지필평가 금요일로 변경', subStatus: '', status: '진행 중' },
-];
+import { Pledge, defaultPledges, loadPledgesFromStorage } from '@/lib/pledges';
 
 // 학생회 조직 - 실제 명단
 const PRESIDENT = { role: '학생회장', name: '한의준' };
@@ -49,50 +23,48 @@ const DEPARTMENTS = [
 const totalMemberCount = 1 + VICE_PRESIDENTS.length + DEPARTMENTS.length * 2;
 
 export default function MainPage() {
-  const [pledges, setPledges] = useState<Pledge[]>(() => {
-    if (typeof window === 'undefined') return [];
-    const saved = localStorage.getItem('sc_pledges');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (isValidPledges(parsed)) return parsed;
-    }
-    localStorage.setItem('sc_pledges', JSON.stringify(defaultPledges));
-    return defaultPledges;
-  });
-
-  const [progressPercent, setProgressPercent] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    const saved = localStorage.getItem('sc_progress_percent');
-    const parsed = saved ? Number(saved) : 0;
-    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
-  });
-
-  const [updatedAt] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    const now = new Date();
-    return `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-
+  // 서버와 클라이언트의 첫 렌더가 항상 같은 값(기본값)으로 시작하도록 하고,
+  // localStorage/Date 등 클라이언트에서만 알 수 있는 값은 마운트 후 useEffect에서
+  // 갱신함 - useState 초기화 함수 안에서 typeof window로 분기하면 SSR과 클라이언트
+  // 첫 렌더 결과가 달라져 하이드레이션 mismatch가 발생함
+  const [pledges, setPledges] = useState<Pledge[]>(defaultPledges);
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+  const [updatedAt, setUpdatedAt] = useState('');
   // 학생회 출범일(2026.07.16) 기준 D-day
-  const [ddayText] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    const launchDate = new Date('2026-07-16T00:00:00');
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfLaunch = new Date(launchDate.getFullYear(), launchDate.getMonth(), launchDate.getDate());
-    const diffDays = Math.floor(
-      (startOfToday.getTime() - startOfLaunch.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return diffDays >= 0 ? `D+${diffDays}` : `D-${Math.abs(diffDays)}`;
-  });
+  const [ddayText, setDdayText] = useState('');
+
+  useEffect(() => {
+    // localStorage 값은 브라우저에서만 읽을 수 있어 마운트 후에만 반영 가능함 -
+    // useState 초기값으로 옮기면 SSR과 값이 달라져 하이드레이션 mismatch가 재발함.
+    // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
+    // (admin 페이지의 loadIssues와 동일한 패턴)
+    const timer = setTimeout(() => {
+      setPledges(loadPledgesFromStorage());
+
+      const savedPercent = localStorage.getItem('sc_progress_percent');
+      if (savedPercent !== null) {
+        const parsed = Number(savedPercent);
+        if (Number.isFinite(parsed)) setProgressPercent(Math.min(100, Math.max(0, parsed)));
+      }
+
+      const now = new Date();
+      setUpdatedAt(`${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}`);
+
+      const launchDate = new Date('2026-07-16T00:00:00');
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfLaunch = new Date(launchDate.getFullYear(), launchDate.getMonth(), launchDate.getDate());
+      const diffDays = Math.floor(
+        (startOfToday.getTime() - startOfLaunch.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      setDdayText(diffDays >= 0 ? `D+${diffDays}` : `D-${Math.abs(diffDays)}`);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const handleStorageChange = () => {
-      const savedPledges = localStorage.getItem('sc_pledges');
-      if (savedPledges) {
-        const parsed = JSON.parse(savedPledges);
-        if (isValidPledges(parsed)) setPledges(parsed);
-      }
+      setPledges(loadPledgesFromStorage());
 
       const savedPercent = localStorage.getItem('sc_progress_percent');
       if (savedPercent !== null) {
@@ -198,18 +170,24 @@ export default function MainPage() {
           <h2 className="reveal-heading text-2xl sm:text-3xl font-black leading-snug">
             안녕하십니까,
             <br />
-            2026학년도 GSM 학생회 회장단입니다
+            2026-2027년도 여러분과 함께할 
+            <br/>
+             제 9대 학생자치회입니다.
           </h2>
-          <div className="space-y-4 text-sm sm:text-base opacity-80 leading-relaxed lg:pl-8 lg:border-l lg:border-black/10 dark:lg:border-white/10">
+          <div
+            className="space-y-4 text-sm sm:text-base opacity-80 leading-relaxed lg:pl-8 lg:border-l lg:border-black/10 dark:lg:border-white/10"
+            style={{ wordBreak: 'keep-all', overflowWrap: 'break-word' }}
+          >
             <p>
-              학생회는 학생을 대신해 말하는 조직이 아니라, 학생이 직접 말할 수 있는 통로를
-              만드는 조직이라고 생각합니다. 그래서 저희는 새로운 행사를 늘리는 일보다, 이미
-              불편했던 것들을 하나씩 정리하는 일에 먼저 집중하고 있습니다.
+              학생회는 모든 학생의 의견에 귀 기울이고, 다양한 생각이 학교생활에 반영될 수 있도록 노력하겠습니다.
             </p>
             <p>
-              학생들이 자주 마주하는 크고 작은 문제들을 기록하고, 진행 상황을 이 페이지에
-              투명하게 공개합니다. 아래 공약 이행 현황은 학생회 회의 결과에 따라 수시로
-              갱신됩니다.
+              눈에 띄는 활동뿐만 아니라 학생들이 일상에서 느끼는 불편과 고민을 세심하게{' '}살피겠습니다.
+              <br />
+              의견을 수렴하는 데 그치지 않고, 실천 가능한 방법을 찾아 꾸준히 개선해 나가겠습니다.
+            </p>
+            <p>
+              학생들과 함께 고민하고 함께 만들어 가며, 신뢰받는 학생회가 되겠습니다.
             </p>
 
             <div className="grid grid-cols-3 gap-6 pt-6 mt-2 border-t border-black/10 dark:border-white/10">
@@ -223,7 +201,7 @@ export default function MainPage() {
               </div>
               <div>
                 <div className="text-xs opacity-50">임기</div>
-                <div className="text-sm font-bold mt-1">2026.03 - 2027.02</div>
+                <div className="text-sm font-bold mt-1">2026.07 - 2027.07</div>
               </div>
             </div>
           </div>

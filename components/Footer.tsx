@@ -13,7 +13,7 @@ export default function Footer() {
       <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
         <div>
           <span className="font-bold text-base">GSM 학생회</span>
-          <p className="text-sm text-white/60 mt-2">학생들의 목소리를 듣고 행동으로 답하는 학생 자치를 실현합니다.</p>
+          <p className="text-sm text-white/60 mt-2">학생의 목소리를, 변화로 증명하겠습니다.</p>
         </div>
 
         <p className="text-xs text-white/40">© {new Date().getFullYear()} GSM 학생회. All rights reserved.</p>
