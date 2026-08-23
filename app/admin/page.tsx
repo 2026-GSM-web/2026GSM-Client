@@ -15,33 +15,7 @@ import {
   updateSuggestionStatus,
   UserInfo,
 } from '@/lib/api';
-
-type PledgeStatus = '진행 중' | '시범 운영 중' | '완료';
-
-interface Pledge {
-  id: string;
-  title: string;
-  subStatus: string;
-  status: PledgeStatus;
-}
-
-const STATUS_VALUES: PledgeStatus[] = ['진행 중', '시범 운영 중', '완료'];
-
-// localStorage에 예전 방식(done boolean 기반)의 데이터가 남아있을 수 있어
-// status 값을 갖춘 유효한 형태인지 확인 후, 아니면 기본값으로 대체
-function isValidPledges(data: unknown): data is Pledge[] {
-  return (
-    Array.isArray(data) &&
-    data.every((p) => p && typeof p.title === 'string' && STATUS_VALUES.includes(p.status))
-  );
-}
-
-const defaultPledges: Pledge[] = [
-  { id: 'p1', title: 'AI 프로 지원', subStatus: '', status: '진행 중' },
-  { id: 'p2', title: '전공 동아리 활성화', subStatus: '', status: '진행 중' },
-  { id: 'p3', title: '교내 대회 개최', subStatus: '', status: '진행 중' },
-  { id: 'p4', title: '지필평가 금요일로 변경', subStatus: '', status: '진행 중' },
-];
+import { Pledge, PledgeStatus, STATUS_VALUES, loadPledgesFromStorage } from '@/lib/pledges';
 
 const BTN_PRIMARY =
   'navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold hover:brightness-110 dark:hover:bg-blue-400 active:brightness-90 active:scale-95 transition';
@@ -106,14 +80,7 @@ function AdminPageContent() {
 
   const [pledges, setPledges] = useState<Pledge[]>(() => {
     if (typeof window === 'undefined') return [];
-    const saved = localStorage.getItem('sc_pledges');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (isValidPledges(parsed)) return parsed;
-    }
-
-    localStorage.setItem('sc_pledges', JSON.stringify(defaultPledges));
-    return defaultPledges;
+    return loadPledgesFromStorage();
   });
 
   const [progressPercent, setProgressPercent] = useState<number>(() => {
