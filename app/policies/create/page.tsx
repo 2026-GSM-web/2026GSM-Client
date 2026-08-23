@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { startDataGsmLogin } from '@/lib/auth';
 import { ApiError, STATUS_LABELS, Suggestion, createSuggestion, getMySuggestions } from '@/lib/api';
@@ -24,7 +24,7 @@ function statusBadgeClass(status: Suggestion['status']) {
   return `${base} bg-navy/10 text-navy border-navy/30 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/30`;
 }
 
-export default function CreatePolicyPage() {
+function CreatePolicyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -242,5 +242,19 @@ export default function CreatePolicyPage() {
             </button>
       </form>
     </main>
+  );
+}
+
+export default function CreatePolicyPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-[80vh] flex items-center justify-center px-4">
+          <p className="text-sm opacity-50">불러오는 중...</p>
+        </main>
+      }
+    >
+      <CreatePolicyPageContent />
+    </Suspense>
   );
 }

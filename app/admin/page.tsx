@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { startDataGsmLogin } from '@/lib/auth';
 import {
@@ -56,7 +56,7 @@ function statusButtonClass(active: boolean) {
   }`;
 }
 
-export default function AdminPage() {
+function AdminPageContent() {
   const searchParams = useSearchParams();
 
   const isDataGsmLogged = searchParams.get('isLoggedIn') === 'true';
@@ -471,5 +471,19 @@ export default function AdminPage() {
       )}
 
     </main>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-[80vh] flex items-center justify-center px-4">
+          <p className="text-sm opacity-50">불러오는 중...</p>
+        </main>
+      }
+    >
+      <AdminPageContent />
+    </Suspense>
   );
 }
