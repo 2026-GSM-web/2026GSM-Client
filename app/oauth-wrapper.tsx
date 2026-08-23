@@ -15,7 +15,7 @@ export function ClientOAuthProvider({ children }: { children: React.ReactNode })
   return (
     <OAuthProviderInner
       clientId="cd56665d-0a20-4e8e-966d-fac6875da82b"
-      redirectUri="http://localhost:8080/login/oauth2/code/school"
+      redirectUri="http://service.gsmsv.site:35493/login/oauth2/code/school"
       authMode="PKCE"
     >
       {children}
