@@ -3,128 +3,344 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+type PledgeStatus = '진행 중' | '시범 운영 중' | '완료';
+
 interface Pledge {
   id: string;
   title: string;
-  percent: number;
-  color: string;
-  history: { date: string; reason: string; delta: number }[];
+  subStatus: string;
+  status: PledgeStatus;
 }
+
+const STATUS_VALUES: PledgeStatus[] = ['진행 중', '시범 운영 중', '완료'];
+
+// localStorage에 예전 방식(done boolean 기반)의 데이터가 남아있을 수 있어
+// status 값을 갖춘 유효한 형태인지 확인 후, 아니면 기본값으로 대체
+function isValidPledges(data: unknown): data is Pledge[] {
+  return (
+    Array.isArray(data) &&
+    data.every((p) => p && typeof p.title === 'string' && STATUS_VALUES.includes(p.status))
+  );
+}
+
+const defaultPledges: Pledge[] = [
+  { id: 'p1', title: 'AI 프로 지원', subStatus: '', status: '진행 중' },
+  { id: 'p2', title: '전공 동아리 활성화', subStatus: '', status: '진행 중' },
+  { id: 'p3', title: '교내 대회 개최', subStatus: '', status: '진행 중' },
+  { id: 'p4', title: '지필평가 금요일로 변경', subStatus: '', status: '진행 중' },
+];
+
+// 학생회 조직 - 실제 명단
+const PRESIDENT = { role: '학생회장', name: '한의준' };
+const VICE_PRESIDENTS = [
+  { role: '부회장', name: '박채은' },
+  { role: '부회장', name: '김준수' },
+];
+const DEPARTMENTS = [
+  { dept: '복지부', head: '정윤서', sub: '이다원' },
+  { dept: '전공부', head: '정연돈', sub: '임서하' },
+  { dept: '행사기획부', head: '이찬진', sub: '최형지' },
+  { dept: '정보통신부', head: '정수진', sub: '이시우' },
+  { dept: '문화체육부', head: '이진서', sub: '김민욱' },
+  { dept: '학생생활안전부', head: '양은준', sub: '김승우' },
+  { dept: '방송부', head: '김민선', sub: '송건호' },
+];
+// 회장 1명 + 부회장 N명 + 부서별 부장/차장 2명씩
+const totalMemberCount = 1 + VICE_PRESIDENTS.length + DEPARTMENTS.length * 2;
 
 export default function MainPage() {
   const [pledges, setPledges] = useState<Pledge[]>(() => {
     if (typeof window === 'undefined') return [];
     const saved = localStorage.getItem('sc_pledges');
-    if (saved) return JSON.parse(saved);
-
-    const defaultPledges: Pledge[] = [
-      { id: 'p1', title: 'AI 프로 지원', percent: 0, color: '#3b82f6', history: [] },
-      { id: 'p2', title: '전공 동아리 활성화', percent: 0, color: '#10b981', history: [] },
-      { id: 'p3', title: '교내 대회 개최', percent: 0, color: '#f59e0b', history: [] },
-      { id: 'p4', title: '지필평가 금요일로 변경', percent: 0, color: '#8b5cf6', history: [] },
-    ];
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (isValidPledges(parsed)) return parsed;
+    }
     localStorage.setItem('sc_pledges', JSON.stringify(defaultPledges));
     return defaultPledges;
   });
 
-  const [ddayText, setDdayText] = useState<string>('');
+  const [progressPercent, setProgressPercent] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = localStorage.getItem('sc_progress_percent');
+    const parsed = saved ? Number(saved) : 0;
+    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
+  });
+
+  const [updatedAt] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const now = new Date();
+    return `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  // 학생회 출범일(2026.07.16) 기준 D-day
+  const [ddayText] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const launchDate = new Date('2026-07-16T00:00:00');
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfLaunch = new Date(launchDate.getFullYear(), launchDate.getMonth(), launchDate.getDate());
+    const diffDays = Math.floor(
+      (startOfToday.getTime() - startOfLaunch.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return diffDays >= 0 ? `D+${diffDays}` : `D-${Math.abs(diffDays)}`;
+  });
 
   useEffect(() => {
     const handleStorageChange = () => {
-      const saved = localStorage.getItem('sc_pledges');
-      if (saved) setPledges(JSON.parse(saved));
+      const savedPledges = localStorage.getItem('sc_pledges');
+      if (savedPledges) {
+        const parsed = JSON.parse(savedPledges);
+        if (isValidPledges(parsed)) setPledges(parsed);
+      }
+
+      const savedPercent = localStorage.getItem('sc_progress_percent');
+      if (savedPercent !== null) {
+        const parsedPercent = Number(savedPercent);
+        if (Number.isFinite(parsedPercent)) {
+          setProgressPercent(Math.min(100, Math.max(0, parsedPercent)));
+        }
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
 
-    const launchDate = new Date('2026-07-16T00:00:00');
-    const updateDday = () => {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startOfLaunch = new Date(launchDate.getFullYear(), launchDate.getMonth(), launchDate.getDate());
-      const diffDays = Math.floor((startOfToday.getTime() - startOfLaunch.getTime()) / (1000 * 60 * 60 * 24));
-      setDdayText(diffDays >= 0 ? `D+${diffDays}` : `D-${Math.abs(diffDays)}`);
-    };
-
-    updateDday();
-    const interval = setInterval(updateDday, 1000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const avgPercent = pledges.length > 0
-    ? Math.min(100, Math.round(pledges.reduce((acc, cur) => acc + cur.percent, 0) / pledges.length))
-    : 0;
+  // 스크롤 트리거 애니메이션 - clip-path가 없는 .reveal 섹션만 관찰하고,
+  // 뷰포트에 처음 들어오는 순간 .is-revealed를 붙인 뒤 바로 unobserve함
+  // (한 번 본 섹션은 스크롤을 올렸다 내려도 다시 재생되지 않음 - 반복
+  // 재생은 다시 읽으려 위로 스크롤할 때마다 내용이 사라졌다 나타나서
+  // 오히려 방해가 됨). 안쪽의 .reveal-heading/.reveal-item은 CSS 자식
+  // 선택자로 연쇄 반응해서 같이 드러남 - clip-path로 스스로를 가리는
+  // 요소를 직접 관찰 대상으로 삼으면 "화면에 들어옴" 판정 자체가 나지
+  // 않아 영영 숨어있게 됨(공약 목록이 통째로 사라져 보이던 원인)
+  useEffect(() => {
+    const sections = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
+    if (sections.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-revealed');
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
+    );
+
+    sections.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
+
+  const completedCount = pledges.filter((p) => p.status === '완료').length;
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-16">
-      <section className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-12 items-end pb-12 border-b border-black/10 dark:border-white/10">
-        <div className="space-y-6">
-          <h1 className="text-5xl font-extrabold leading-tight">학생과 함께,<br />약속을 지키는 학생회</h1>
-          <p className="text-base opacity-75 max-w-lg">공약의 진행 상황을 투명하게 공개하고, 모든 학생의 목소리가 정책이 되는 과정을 함께 만들어갑니다.</p>
-          <div className="flex gap-3">
-            {/* 👇 다크모드 분기 클래스(dark:bg-white dark:text-black)를 제거하고 주황색(amber-600) 스타일로 고정했습니다. */}
-            <a 
-              href="#pledges-section" 
-              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-sm transition"
-            >
-              공약 이행률 보기 →
-            </a>
-            <Link href="/policies/create" className="px-5 py-2.5 border border-black/20 dark:border-white/20 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/5 transition">
-              정책 제안하기
-            </Link>
+    <main>
+      {/* 히어로 */}
+      <section className="relative flex items-center min-h-screen overflow-hidden">
+        {/* background-attachment: fixed로 헤더와 같은 뷰포트 기준 좌표를 써서
+            스크롤 전(헤더가 사진 위에 있을 때) 이음새 없이 이어지게 함 */}
+        <div
+          className="absolute inset-0 bg-cover"
+          style={{
+            backgroundImage: "url('/images/hero-school.webp')",
+            backgroundPosition: 'center top',
+            backgroundAttachment: 'fixed',
+            animation: 'hero-zoom 20s ease-out forwards',
+          }}
+        />
+        {/* 다크모드에서는 사진이 밝은 대낮 그대로라 페이지 톤과 붕 떠보여서,
+            오버레이를 더 어둡고 진하게 깔아 나머지 다크 배경과 자연스럽게 이어지게 함 */}
+        <div className="absolute inset-0 bg-[#33618a]/85 dark:bg-[#0a121c]/92" />
+        <div className="relative max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-24 w-full">
+          <div
+            className="flex items-center gap-3 flex-wrap opacity-0"
+            style={{ animation: 'fade-up 0.8s ease-out 0.1s forwards' }}
+          >
+            <span className="text-xs font-bold text-white/80 tracking-[0.2em] uppercase">
+              2026 Student Council
+            </span>
+            {ddayText && (
+              <span className="text-xs font-bold text-white tracking-[0.2em]">· {ddayText}</span>
+            )}
           </div>
-        </div>
-        <div className="text-right">
-          <span className="text-xs tracking-widest opacity-60 block uppercase">학생회 출범</span>
-          <span className="text-7xl font-black text-amber-600 leading-none min-h-[72px] block">{ddayText}</span>
+          <h1
+            className="text-4xl sm:text-6xl font-black text-white mt-4 leading-tight opacity-0"
+            style={{ animation: 'fade-up 0.8s ease-out 0.25s forwards' }}
+          >
+            Welcome to
+            <br />
+            GSM 학생회
+          </h1>
+          <div
+            className="w-16 h-1 bg-white/70 rounded-full mt-6 opacity-0"
+            style={{ animation: 'fade-up 0.8s ease-out 0.4s forwards' }}
+          />
+          <p
+            className="text-sm sm:text-base text-white/80 mt-6 max-w-md leading-relaxed opacity-0"
+            style={{ animation: 'fade-up 0.8s ease-out 0.5s forwards' }}
+          >
+            학생 한 사람의 목소리가 학교의 하루를 바꿉니다. 오늘의 학교를 함께 기록합니다.
+          </p>
         </div>
       </section>
 
-      <section id="pledges-section" className="py-16">
-        <span className="text-xs font-bold text-amber-600 tracking-wider">TRANSPARENCY</span>
-        <h2 className="text-2xl font-bold mt-1">공약 이행률</h2>
+      {/* 소개 */}
+      <section id="about" className="reveal scroll-mt-16 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-20">
+        <span className="text-xs font-bold text-navy/70 dark:text-blue-400 tracking-[0.2em] uppercase">
+          소개
+        </span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8 mt-4">
+          <h2 className="reveal-heading text-2xl sm:text-3xl font-black leading-snug">
+            안녕하십니까,
+            <br />
+            2026학년도 GSM 학생회 회장단입니다
+          </h2>
+          <div className="space-y-4 text-sm sm:text-base opacity-80 leading-relaxed lg:pl-8 lg:border-l lg:border-black/10 dark:lg:border-white/10">
+            <p>
+              학생회는 학생을 대신해 말하는 조직이 아니라, 학생이 직접 말할 수 있는 통로를
+              만드는 조직이라고 생각합니다. 그래서 저희는 새로운 행사를 늘리는 일보다, 이미
+              불편했던 것들을 하나씩 정리하는 일에 먼저 집중하고 있습니다.
+            </p>
+            <p>
+              학생들이 자주 마주하는 크고 작은 문제들을 기록하고, 진행 상황을 이 페이지에
+              투명하게 공개합니다. 아래 공약 이행 현황은 학생회 회의 결과에 따라 수시로
+              갱신됩니다.
+            </p>
 
-        <div className="mt-8 p-8 border border-black/10 dark:border-white/10 rounded-xl bg-black/5 dark:bg-white/5 space-y-6">
+            <div className="grid grid-cols-3 gap-6 pt-6 mt-2 border-t border-black/10 dark:border-white/10">
+              <div>
+                <div className="text-xs opacity-50">학생회 인원</div>
+                <div className="text-sm font-bold mt-1">{totalMemberCount}명</div>
+              </div>
+              <div>
+                <div className="text-xs opacity-50">학생회 부서</div>
+                <div className="text-sm font-bold mt-1">{DEPARTMENTS.length}개 부서</div>
+              </div>
+              <div>
+                <div className="text-xs opacity-50">임기</div>
+                <div className="text-sm font-bold mt-1">2026.03 - 2027.02</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 공약 이행 현황 */}
+      <section id="pledges" className="reveal reveal-flat scroll-mt-16 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-20">
+        <span className="text-xs font-bold text-navy/70 dark:text-blue-400 tracking-[0.2em] uppercase">
+          이행 현황
+        </span>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mt-4">
+          <h2 className="reveal-heading text-2xl sm:text-3xl font-black">우리의 약속, 지금까지</h2>
+          <p className="text-xs sm:text-sm opacity-50">
+            총 {pledges.length}개 공약 중 {completedCount}개 완료 · {updatedAt} 기준
+          </p>
+        </div>
+
+        <div className="mt-8">
           <div className="flex items-baseline gap-2">
-            <span className="text-5xl font-black">{avgPercent}</span>
-            <span className="text-xl opacity-60">%</span>
-            <span className="text-xs opacity-50 ml-2">평균 공약 이행률</span>
+            <span className="text-5xl font-black text-black dark:text-white tabular-nums">
+              {progressPercent}
+            </span>
+            <span className="text-2xl font-black text-black dark:text-white">%</span>
+            <span className="text-sm opacity-50">전체 평균 이행률</span>
+          </div>
+          <div className="mt-4 h-1.5 w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-navy dark:bg-blue-500 rounded-full transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-8 divide-y divide-black/10 dark:divide-white/10 border-t border-black/10 dark:border-white/10">
+          {pledges.map((p, idx) => (
+            <div
+              key={p.id}
+              className="reveal-item flex items-center justify-between gap-4 py-4"
+              style={{ transitionDelay: `${Math.min(idx, 8) * 160}ms` }}
+            >
+              <div className="flex items-baseline gap-4 min-w-0">
+                <span className="text-xs opacity-40 shrink-0 tabular-nums">
+                  {String(idx + 1).padStart(2, '0')}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm sm:text-base truncate">{p.title}</p>
+                  {p.subStatus && <p className="text-xs opacity-50 mt-0.5">{p.subStatus}</p>}
+                </div>
+              </div>
+              <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-navy/10 text-navy border border-navy/20 dark:bg-blue-400/10 dark:text-blue-300 dark:border-blue-400/30">
+                {p.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 조직도 */}
+      <section id="orgchart" className="reveal scroll-mt-16 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 py-12">
+        <span className="text-xs font-bold text-navy/70 dark:text-blue-400 tracking-[0.2em] uppercase">
+          조직도
+        </span>
+        <h2 className="reveal-heading text-2xl sm:text-3xl font-black mt-4">학생회 조직 구성</h2>
+
+        <div className="flex flex-col items-center mt-8">
+          <div className="navy-surface text-white px-8 py-4 text-center shadow-sm rounded-md">
+            <div className="font-bold text-sm">{PRESIDENT.role}</div>
+            <div className="text-xs text-white/70 mt-1">{PRESIDENT.name}</div>
           </div>
 
-          {/* 공약별 진행도 프로그레스 바 */}
-          <div className="flex h-8 w-full bg-black/10 dark:bg-white/10 rounded-md overflow-hidden">
-            {pledges.map((p) => (
-              <div 
-                key={p.id} 
-                style={{ width: `${p.percent / pledges.length}%`, backgroundColor: p.color }} 
-                className="h-full transition-all duration-300" 
-                title={`${p.title}: ${p.percent}%`} 
-              />
+          <div className="w-px h-4 bg-black/15 dark:bg-white/15" />
+          <div className="flex w-56">
+            <div className="w-1/2 h-4 border-t border-r border-black/15 dark:border-white/15" />
+            <div className="w-1/2 h-4 border-t border-l border-black/15 dark:border-white/15" />
+          </div>
+
+          <div className="flex gap-16 sm:gap-24">
+            {VICE_PRESIDENTS.map((vp) => (
+              <div
+                key={vp.name}
+                className="navy-surface text-white px-6 py-3 text-center shadow-sm rounded-md"
+              >
+                <div className="font-bold text-sm">{vp.role}</div>
+                <div className="text-xs text-white/70 mt-1">{vp.name}</div>
+              </div>
             ))}
           </div>
+        </div>
 
-          {/* 공약 카드 목록 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {pledges.map((p) => {
-              const lastHistory = p.history[p.history.length - 1];
-              return (
-                <div key={p.id} className="p-4 border border-black/10 dark:border-white/10 rounded-lg space-y-2 bg-black/5 dark:bg-white/5">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-                    <span className="font-bold text-sm">{p.title}</span>
-                  </div>
-                  <div className="text-xs opacity-60">
-                    <span className="font-semibold text-black dark:text-white">{p.percent}%</span>
-                    {lastHistory ? ` · 최근 ${lastHistory.date}` : ''}
-                  </div>
-                </div>
-              );
-            })}
+        <div className="mt-8 pt-6 border-t border-black/10 dark:border-white/10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+          {DEPARTMENTS.map((d) => (
+            <div
+              key={d.dept}
+              className="p-4 rounded-md border border-black/10 dark:border-white/10 text-center bg-white/70 dark:bg-white/5 transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-navy/30 dark:hover:border-blue-400/40"
+            >
+              <div className="font-bold text-sm">{d.dept}</div>
+              <div className="text-xs opacity-60 mt-2"> 부장 {d.head} </div>
+              <div className="text-xs opacity-40 mt-0.5"> 차장 {d.sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 정책 제안 CTA */}
+      <section className="reveal reveal-brief max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 pb-12">
+        <div className="rounded-2xl navy-surface text-white px-8 py-8 text-center sm:text-left sm:flex sm:items-center sm:justify-between gap-6">
+          <div>
+            <h3 className="text-xl font-bold">학생회에 바라는 점이 있나요?</h3>
+            <p className="text-sm text-white/70 mt-1">자유롭게 제안해 주시면 검토 후 답변드립니다.</p>
           </div>
+          <Link
+            href="/policies/create"
+            className="inline-block mt-6 sm:mt-0 px-6 py-3 bg-white text-navy font-semibold text-sm rounded-lg hover:bg-white/90 transition shrink-0"
+          >
+            건의하러 가기 →
+          </Link>
         </div>
       </section>
     </main>

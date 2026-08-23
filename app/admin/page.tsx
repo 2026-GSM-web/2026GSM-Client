@@ -1,20 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useOAuth } from '@themoment-team/datagsm-oauth-react';
 
-interface HistoryItem {
-  date: string;
-  reason: string;
-  delta: number;
-}
+type PledgeStatus = '진행 중' | '시범 운영 중' | '완료';
 
 interface Pledge {
   id: string;
   title: string;
-  percent: number;
-  color: string;
-  history: HistoryItem[];
+  subStatus: string;
+  status: PledgeStatus;
 }
+
+const STATUS_VALUES: PledgeStatus[] = ['진행 중', '시범 운영 중', '완료'];
 
 interface Comment {
   id: number;
@@ -34,24 +33,49 @@ interface Issue {
   comments: Comment[];
 }
 
+// localStorage에 예전 방식(done boolean 기반)의 데이터가 남아있을 수 있어
+// status 값을 갖춘 유효한 형태인지 확인 후, 아니면 기본값으로 대체
+function isValidPledges(data: unknown): data is Pledge[] {
+  return (
+    Array.isArray(data) &&
+    data.every((p) => p && typeof p.title === 'string' && STATUS_VALUES.includes(p.status))
+  );
+}
+
+const defaultPledges: Pledge[] = [
+  { id: 'p1', title: 'AI 프로 지원', subStatus: '', status: '진행 중' },
+  { id: 'p2', title: '전공 동아리 활성화', subStatus: '', status: '진행 중' },
+  { id: 'p3', title: '교내 대회 개최', subStatus: '', status: '진행 중' },
+  { id: 'p4', title: '지필평가 금요일로 변경', subStatus: '', status: '진행 중' },
+];
+
+const STATUS_OPTIONS = ['대기중', '검토중', '시행완료'];
+
+const BTN_PRIMARY =
+  'navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold hover:brightness-110 dark:hover:bg-blue-400 active:brightness-90 active:scale-95 transition';
+const INPUT_CLASS =
+  'w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400';
+
 export default function AdminPage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [accessCode, setAccessCode] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const searchParams = useSearchParams();
+  const { login } = useOAuth();
+
+  // DataGSM 계정 로그인 여부로만 접근을 판단함.
+  // TODO: 백엔드에 임원 승인 여부를 확인하는 엔드포인트가 생기면, 로그인 여부만이 아니라
+  // "로그인한 DataGSM 계정이 승인된 임원인지"까지 서버에 확인하도록 교체해야 함.
+  // 그 전까지는 DataGSM 계정만 있으면(=재학생 누구나) 이 페이지에 들어올 수 있음.
+  const isDataGsmLogged = searchParams.get('isLoggedIn') === 'true';
 
   const [activeTab, setActiveTab] = useState<'pledges' | 'issues'>('pledges');
 
   const [pledges, setPledges] = useState<Pledge[]>(() => {
     if (typeof window === 'undefined') return [];
     const saved = localStorage.getItem('sc_pledges');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (isValidPledges(parsed)) return parsed;
+    }
 
-    const defaultPledges: Pledge[] = [
-      { id: 'p1', title: 'AI 프로 지원', percent: 0, color: '#3b82f6', history: [] },
-      { id: 'p2', title: '전공 동아리 활성화', percent: 0, color: '#10b981', history: [] },
-      { id: 'p3', title: '교내 대회 개최', percent: 0, color: '#f59e0b', history: [] },
-      { id: 'p4', title: '지필평가 금요일로 변경', percent: 0, color: '#8b5cf6', history: [] },
-    ];
     localStorage.setItem('sc_pledges', JSON.stringify(defaultPledges));
     return defaultPledges;
   });
@@ -63,12 +87,15 @@ export default function AdminPage() {
     return [];
   });
 
-  const [selectedPledgeId, setSelectedPledgeId] = useState<string>(() => pledges[0]?.id || '');
-  const [progressReason, setProgressReason] = useState('');
-  const [progressPercent, setProgressPercent] = useState('');
-  const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
+  const [progressPercent, setProgressPercent] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = localStorage.getItem('sc_progress_percent');
+    const parsed = saved ? Number(saved) : 0;
+    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
+  });
+  const [percentInput, setPercentInput] = useState(String(progressPercent));
 
-  const VALID_CODES = ['gsm1!!', 'gsm2!!', 'gsm3!!'];
+  const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
 
   const savePledges = (newPledges: Pledge[]) => {
     setPledges(newPledges);
@@ -82,40 +109,39 @@ export default function AdminPage() {
     window.dispatchEvent(new Event('storage'));
   };
 
-  const handleResetPledges = () => {
-    if (confirm('모든 공약 진행률을 0%로 초기화하시겠습니까?')) {
-      const resetPledges = pledges.map((p) => ({
-        ...p,
-        percent: 0,
-        history: [],
-      }));
-      savePledges(resetPledges);
-      alert('공약 진행 상황이 0%로 초기화되었습니다.');
+  const handleSavePercent = () => {
+    const value = Math.min(100, Math.max(0, Math.round(Number(percentInput) || 0)));
+    setProgressPercent(value);
+    setPercentInput(String(value));
+    localStorage.setItem('sc_progress_percent', String(value));
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const handleDeletePledge = (pledgeId: string) => {
+    if (confirm('이 공약을 삭제하시겠습니까?')) {
+      savePledges(pledges.filter((p) => p.id !== pledgeId));
     }
   };
 
-  const handleAddProgress = (e: React.FormEvent) => {
-    e.preventDefault();
-    const pct = parseInt(progressPercent, 10);
-    if (!progressReason.trim() || isNaN(pct) || pct <= 0) return alert('올바른 사유와 퍼센트를 입력해 주세요.');
+  const handleResetPledges = () => {
+    if (confirm('모든 공약을 \'진행 중\' 상태로 초기화하시겠습니까?')) {
+      const resetPledges = pledges.map((p) => ({ ...p, status: '진행 중' as PledgeStatus, subStatus: '' }));
+      savePledges(resetPledges);
+      alert('공약 진행 상황이 초기화되었습니다.');
+    }
+  };
 
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+  const handleUpdatePledgeStatus = (pledgeId: string, status: PledgeStatus) => {
+    savePledges(pledges.map((p) => (p.id === pledgeId ? { ...p, status } : p)));
+  };
 
-    const updated = pledges.map((p) => {
-      if (p.id === selectedPledgeId) {
-        return {
-          ...p,
-          percent: Math.min(100, p.percent + pct),
-          history: [...p.history, { date: today, reason: progressReason.trim(), delta: pct }],
-        };
-      }
-      return p;
-    });
+  const handleUpdatePledgeSubStatus = (pledgeId: string, subStatus: string) => {
+    setPledges(pledges.map((p) => (p.id === pledgeId ? { ...p, subStatus } : p)));
+  };
 
-    savePledges(updated);
-    setProgressReason('');
-    setProgressPercent('');
-    alert('공약 진행 상황이 반영되었습니다.');
+  const handleBlurPledgeSubStatus = () => {
+    localStorage.setItem('sc_pledges', JSON.stringify(pledges));
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleDeleteIssue = (id: string) => {
@@ -149,61 +175,49 @@ export default function AdminPage() {
     saveIssues(issues.map((i) => (i.id === issueId ? { ...i, status: newStatus } : i)));
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (VALID_CODES.includes(accessCode.trim())) {
-      setIsLoggedIn(true);
-      setErrorMessage('');
-      setAccessCode('');
-    } else {
-      setErrorMessage('유효하지 않은 관리자 코드입니다.');
-    }
-  };
-
-  if (!isLoggedIn) {
+  // ------------------------------------------------------------- //
+  // DataGSM 로그인 전
+  // ------------------------------------------------------------- //
+  if (!isDataGsmLogged) {
     return (
       <main className="min-h-[80vh] flex items-center justify-center px-4">
-        <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-black/5 dark:bg-white/5">
-          <span className="text-xs font-bold text-amber-600 tracking-wider">ADMIN ACCESS</span>
-          <h1 className="text-xl font-bold mt-1">관리자 인증</h1>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              placeholder="관리자 코드를 입력하세요"
-              className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-amber-600"
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              autoFocus
-            />
-            {errorMessage && <p className="text-xs text-red-500 font-medium">{errorMessage}</p>}
-            <button type="submit" className="w-full py-2.5 bg-amber-600 text-white font-semibold text-sm rounded-lg hover:bg-amber-700 transition">
-              인증하고 들어가기
-            </button>
-          </form>
+        <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
+          <h1 className="text-xl font-bold">관리자 인증</h1>
+          <p className="text-xs opacity-50">학생회 관리자만 접근할 수 있는 페이지입니다.</p>
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.setItem('sc_oauth_return_to', '/admin');
+              login();
+            }}
+            className={`w-full py-3.5 text-sm rounded-xl ${BTN_PRIMARY}`}
+          >
+            DataGSM 계정으로 로그인하기
+          </button>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-12 space-y-8">
+    <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 pt-12 pb-24 space-y-8">
       <div className="pb-4 border-b border-black/10 dark:border-white/10">
-        <h1 className="text-2xl font-bold">🔒 관리자 대시보드</h1>
+        <h1 className="text-2xl font-bold">관리자 대시보드</h1>
       </div>
 
-      <div className="flex justify-between items-center border-b border-black/10 dark:border-white/10 pb-3">
-        <div className="flex gap-3">
+      <div className="flex justify-between items-center border-b border-black/10 dark:border-white/10 pb-3 flex-wrap gap-3">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setActiveTab('pledges')}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'pledges' ? 'bg-amber-600 text-white' : 'hover:bg-black/5'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'pledges' ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
           >
-            공약 이행률 관리
+            공약 이행률
           </button>
           <button
             onClick={() => setActiveTab('issues')}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'issues' ? 'bg-amber-600 text-white' : 'hover:bg-black/5'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${activeTab === 'issues' ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
           >
-            제안 및 답변 관리 ({issues.length})
+            제안 및 답변 ({issues.length})
           </button>
         </div>
 
@@ -212,88 +226,87 @@ export default function AdminPage() {
             onClick={handleResetPledges}
             className="text-xs px-3 py-1.5 bg-red-500/10 text-red-600 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition font-medium"
           >
-            전체 0%로 리셋
+            전체 이행 전으로 리셋
           </button>
         )}
       </div>
 
       {activeTab === 'pledges' && (
-        <div className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr] gap-8 items-start">
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold">현재 공약 진행 현황</h2>
-            {pledges.map((p) => (
-              <div key={p.id} className="p-4 border border-black/10 dark:border-white/10 rounded-xl space-y-2 bg-black/5 dark:bg-white/5">
-                <div className="flex justify-between items-center">
-                  <div className="font-bold text-sm">{p.title}</div>
-                  <span className="text-sm font-black">{p.percent}%</span>
-                </div>
-                <div className="w-full bg-black/10 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-                  <div className="h-full transition-all" style={{ width: `${p.percent}%`, backgroundColor: p.color }} />
-                </div>
-                {p.history.length === 0 ? (
-                  <p className="text-xs opacity-40 pt-1">진행 기록이 없습니다.</p>
-                ) : (
-                  p.history.map((h, idx) => (
-                    <div key={idx} className="text-xs opacity-60 flex justify-between pt-1">
-                      <span>+{h.delta}% · {h.reason}</span>
-                      <span>{h.date}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleAddProgress} className="p-6 border border-black/10 dark:border-white/10 rounded-2xl space-y-4 bg-black/5 dark:bg-white/5 sticky top-24">
-            <h3 className="font-bold text-base">진행 상황 추가</h3>
-            <div>
-              <label className="text-xs font-semibold block mb-1">공약 선택</label>
-              <select
-                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20"
-                value={selectedPledgeId}
-                onChange={(e) => setSelectedPledgeId(e.target.value)}
-              >
-                {pledges.map((p) => (
-                  <option key={p.id} value={p.id} className="dark:bg-zinc-800">{p.title}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold block mb-1">사유 (필수)</label>
-              <textarea
-                rows={3}
-                placeholder="진행 내용을 작성하세요"
-                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20"
-                value={progressReason}
-                onChange={(e) => setProgressReason(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold block mb-1">추가할 퍼센트 (%)</label>
+        <div className="space-y-6">
+          <div className="p-4 border border-black/10 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5 space-y-2">
+            <span className="text-sm font-bold">정책 이행률 (%)</span>
+            <p className="text-xs opacity-50">대시보드에 표시될 전체 이행률을 직접 입력해 주세요.</p>
+            <div className="flex items-center gap-2">
               <input
                 type="number"
-                min="1"
-                max="100"
-                placeholder="예: 10"
-                className="w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20"
-                value={progressPercent}
-                onChange={(e) => setProgressPercent(e.target.value)}
+                min={0}
+                max={100}
+                value={percentInput}
+                onChange={(e) => setPercentInput(e.target.value)}
+                className={`${INPUT_CLASS} max-w-[100px]`}
               />
+              <span className="text-sm opacity-50">%</span>
+              <button
+                onClick={handleSavePercent}
+                className={`px-4 py-2 text-xs rounded-lg ${BTN_PRIMARY}`}
+              >
+                저장
+              </button>
             </div>
-            <button type="submit" className="w-full py-2.5 bg-amber-600 text-white font-semibold text-sm rounded-lg hover:bg-amber-700 transition">
-              + 진행 상황 반영하기
-            </button>
-          </form>
+          </div>
+
+          <div className="space-y-3">
+          <p className="text-xs opacity-50">상태와 진행 상황 문구는 대시보드의 이행 현황 목록에 그대로 표시돼요.</p>
+          {pledges.map((p) => (
+            <div
+              key={p.id}
+              className="flex flex-col gap-3 p-4 border border-black/10 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5"
+            >
+              <span className="font-bold text-sm">{p.title}</span>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="진행 상황 (예: 3월 시행 완료)"
+                  value={p.subStatus}
+                  onChange={(e) => handleUpdatePledgeSubStatus(p.id, e.target.value)}
+                  onBlur={handleBlurPledgeSubStatus}
+                  className={`${INPUT_CLASS} sm:flex-1`}
+                />
+
+                <select
+                  value={p.status}
+                  onChange={(e) => handleUpdatePledgeStatus(p.id, e.target.value as PledgeStatus)}
+                  className="p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400 shrink-0"
+                >
+                  {STATUS_VALUES.map((status) => (
+                    <option key={status} value={status} className="text-black">
+                      {status}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeletePledge(p.id)}
+                  className="px-2 py-1 bg-red-500/10 text-red-600 text-xs font-semibold rounded-md hover:bg-red-500/20 transition shrink-0"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          ))}
+          </div>
         </div>
       )}
 
       {activeTab === 'issues' && (
         <div className="space-y-6">
           {issues.length === 0 ? (
-            <div className="text-center py-12 text-sm opacity-50">등록된 이슈가 없습니다.</div>
+            <div className="min-h-[360px] flex items-center justify-center text-sm opacity-50">등록된 이슈가 없습니다.</div>
           ) : (
             issues.map((issue) => (
-              <div key={issue.id} className="p-5 border border-black/10 dark:border-white/10 rounded-xl space-y-4 bg-black/5 dark:bg-white/5">
+              <div key={issue.id} className="p-5 border border-black/10 dark:border-white/10 rounded-xl space-y-4 bg-white/70 dark:bg-white/5">
                 <div className="flex justify-between items-start gap-4">
                   <div>
                     <span className="text-xs px-2 py-0.5 rounded-full border border-black/20 font-medium">{issue.status}</span>
@@ -314,9 +327,9 @@ export default function AdminPage() {
                   <div className="space-y-2 pt-2 border-t border-black/10 dark:border-white/10">
                     <span className="text-xs font-bold opacity-60">등록된 답변</span>
                     {issue.comments.map((c) => (
-                      <div key={c.id} className="p-3 bg-black/5 dark:bg-white/5 rounded-lg text-xs space-y-1">
+                      <div key={c.id} className="p-3 bg-white/70 dark:bg-white/5 rounded-lg text-xs space-y-1">
                         <div className="flex justify-between font-bold">
-                          <span className="text-amber-600">{c.author}</span>
+                          <span className="text-navy dark:text-blue-400">{c.author}</span>
                           <span className="opacity-40">{c.date}</span>
                         </div>
                         <p>{c.text}</p>
@@ -335,53 +348,34 @@ export default function AdminPage() {
                   />
                   <button
                     onClick={() => handleAddComment(issue.id)}
-                    className="px-4 py-2 bg-amber-600 text-white font-semibold text-xs rounded-lg hover:bg-amber-700 transition"
+                    className={`px-4 py-2 text-xs rounded-lg ${BTN_PRIMARY}`}
                   >
                     답변 등록
                   </button>
                 </div>
 
-                <div className="flex gap-2 text-xs pt-1 items-center">
+                <div className="flex gap-2 text-xs pt-1 items-center flex-wrap">
                   <span className="opacity-50 font-medium">상태 변경:</span>
-                  
-                  <button
-                    onClick={() => handleUpdateStatus(issue.id, '대기중')}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
-                      issue.status === '대기중'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'border-black/20 dark:border-white/20 hover:bg-black/5 opacity-70'
-                    }`}
-                  >
-                    대기중
-                  </button>
-
-                  <button
-                    onClick={() => handleUpdateStatus(issue.id, '검토중')}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
-                      issue.status === '검토중'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'border-black/20 dark:border-white/20 hover:bg-black/5 opacity-70'
-                    }`}
-                  >
-                    검토중
-                  </button>
-
-                  <button
-                    onClick={() => handleUpdateStatus(issue.id, '시행완료')}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
-                      issue.status === '시행완료'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                        : 'border-black/20 dark:border-white/20 hover:bg-black/5 opacity-70'
-                    }`}
-                  >
-                    시행완료
-                  </button>
+                  {STATUS_OPTIONS.map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => handleUpdateStatus(issue.id, status)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                        issue.status === status
+                          ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white border-transparent dark:border-blue-500 shadow-sm'
+                          : 'border-black/20 dark:border-white/20 hover:bg-black/5 opacity-70'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
                 </div>
               </div>
             ))
           )}
         </div>
       )}
+
     </main>
   );
 }

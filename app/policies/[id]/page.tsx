@@ -63,8 +63,8 @@ export default function PolicyDetailPage({
       <div className="space-y-2 border-b border-black/10 dark:border-white/10 pb-4">
         <span className={`text-xs px-2.5 py-1 rounded-full font-bold border inline-block ${
           issue.status === '시행완료' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' :
-          issue.status === '검토중' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :
-          'bg-amber-500/10 text-amber-600 border-amber-500/30'
+          issue.status === '검토중' ? 'bg-navy/10 text-navy border-navy/30' :
+          'bg-navy/10 text-navy border-navy/30 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/30'
         }`}>
           {issue.status}
         </span>
@@ -87,10 +87,10 @@ export default function PolicyDetailPage({
           issue.comments.map((c) => (
             <div
               key={c.id}
-              className="p-4 border border-black/10 dark:border-white/10 rounded-lg text-xs space-y-1 bg-black/5 dark:bg-white/5"
+              className="p-4 border border-black/10 dark:border-white/10 rounded-lg text-xs space-y-1 bg-white/70 dark:bg-white/5"
             >
               <div className="flex justify-between font-bold">
-                <span className="text-amber-600">{c.author}</span>
+                <span className="text-navy dark:text-blue-400">{c.author}</span>
                 <span className="opacity-40">{c.date}</span>
               </div>
               <p className="text-sm opacity-80">{c.text}</p>

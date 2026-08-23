@@ -1,0 +1,26 @@
+name: Deploy to School Server
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/2026GSM
+            git fetch origin main
+            git reset --hard origin/main
+            source ~/.nvm/nvm.sh
+            rm -rf .next
+            npm install
+            npm run build
+            pm2 restart gsm-web --update-env
