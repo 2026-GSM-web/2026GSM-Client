@@ -1,8 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useOAuth } from '@themoment-team/datagsm-oauth-react';
+import { startDataGsmLogin } from '@/lib/auth';
+import {
+  ApiError,
+  STATUS_LABELS,
+  STATUS_OPTIONS,
+  Suggestion,
+  deleteSuggestion,
+  getAllSuggestions,
+  getMe,
+  promoteToAdmin,
+  updateSuggestionStatus,
+  UserInfo,
+} from '@/lib/api';
 
 type PledgeStatus = '진행 중' | '시범 운영 중' | '완료';
 
@@ -14,24 +26,6 @@ interface Pledge {
 }
 
 const STATUS_VALUES: PledgeStatus[] = ['진행 중', '시범 운영 중', '완료'];
-
-interface Comment {
-  id: number;
-  author: string;
-  date: string;
-  text: string;
-}
-
-interface Issue {
-  id: string;
-  title: string;
-  author: string;
-  dept: string;
-  status: string;
-  date: string;
-  body: string;
-  comments: Comment[];
-}
 
 // localStorage에 예전 방식(done boolean 기반)의 데이터가 남아있을 수 있어
 // status 값을 갖춘 유효한 형태인지 확인 후, 아니면 기본값으로 대체
@@ -49,22 +43,64 @@ const defaultPledges: Pledge[] = [
   { id: 'p4', title: '지필평가 금요일로 변경', subStatus: '', status: '진행 중' },
 ];
 
-const STATUS_OPTIONS = ['대기중', '검토중', '시행완료'];
-
 const BTN_PRIMARY =
   'navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold hover:brightness-110 dark:hover:bg-blue-400 active:brightness-90 active:scale-95 transition';
 const INPUT_CLASS =
   'w-full p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400';
 
+function statusButtonClass(active: boolean) {
+  return `px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+    active
+      ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white border-transparent dark:border-blue-500 shadow-sm'
+      : 'border-black/20 dark:border-white/20 hover:bg-black/5 opacity-70'
+  }`;
+}
+
 export default function AdminPage() {
   const searchParams = useSearchParams();
-  const { login } = useOAuth();
 
-  // DataGSM 계정 로그인 여부로만 접근을 판단함.
-  // TODO: 백엔드에 임원 승인 여부를 확인하는 엔드포인트가 생기면, 로그인 여부만이 아니라
-  // "로그인한 DataGSM 계정이 승인된 임원인지"까지 서버에 확인하도록 교체해야 함.
-  // 그 전까지는 DataGSM 계정만 있으면(=재학생 누구나) 이 페이지에 들어올 수 있음.
   const isDataGsmLogged = searchParams.get('isLoggedIn') === 'true';
+
+  // 서버에 실제로 임원(ADMIN)인지 확인하는 단계
+  const [me, setMe] = useState<UserInfo | null>(null);
+  const [meError, setMeError] = useState<string | null>(null);
+  const [promoteCode, setPromoteCode] = useState('');
+  const [promoteError, setPromoteError] = useState('');
+  const [promoting, setPromoting] = useState(false);
+
+  useEffect(() => {
+    if (!isDataGsmLogged) return;
+
+    let cancelled = false;
+    getMe()
+      .then((user) => {
+        if (!cancelled) setMe(user);
+      })
+      .catch((err) => {
+        if (!cancelled) setMeError(err instanceof ApiError ? err.message : '내 정보를 불러오지 못했습니다.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDataGsmLogged]);
+
+  const handlePromote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoteCode.trim()) return;
+
+    setPromoting(true);
+    setPromoteError('');
+    try {
+      const result = await promoteToAdmin(promoteCode.trim());
+      setMe((prev) => (prev ? { ...prev, role: result.role } : prev));
+      setPromoteCode('');
+    } catch (err) {
+      setPromoteError(err instanceof ApiError ? err.message : '승격 코드 확인 중 오류가 발생했습니다.');
+    } finally {
+      setPromoting(false);
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<'pledges' | 'issues'>('pledges');
 
@@ -80,13 +116,6 @@ export default function AdminPage() {
     return defaultPledges;
   });
 
-  const [issues, setIssues] = useState<Issue[]>(() => {
-    if (typeof window === 'undefined') return [];
-    const saved = localStorage.getItem('sc_issues');
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
-
   const [progressPercent, setProgressPercent] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const saved = localStorage.getItem('sc_progress_percent');
@@ -95,17 +124,39 @@ export default function AdminPage() {
   });
   const [percentInput, setPercentInput] = useState(String(progressPercent));
 
-  const [commentDrafts, setCommentDrafts] = useState<{ [key: string]: string }>({});
+  // 정책 제안(건의사항) - 실제 백엔드 연동
+  const [issues, setIssues] = useState<Suggestion[]>([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issuesError, setIssuesError] = useState('');
+  const [replyDrafts, setReplyDrafts] = useState<{ [id: number]: string }>({});
+
+  const loadIssues = () => {
+    setIssuesLoading(true);
+    setIssuesError('');
+    getAllSuggestions()
+      .then((page) => {
+        setIssues(page.content);
+        setReplyDrafts(
+          Object.fromEntries(page.content.map((s) => [s.id, s.adminReply ?? '']))
+        );
+      })
+      .catch((err) => {
+        setIssuesError(err instanceof ApiError ? err.message : '제안 목록을 불러오지 못했습니다.');
+      })
+      .finally(() => setIssuesLoading(false));
+  };
+
+  useEffect(() => {
+    if (me?.role !== 'ADMIN' || activeTab !== 'issues') return;
+
+    // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
+    const timer = setTimeout(loadIssues, 0);
+    return () => clearTimeout(timer);
+  }, [me, activeTab]);
 
   const savePledges = (newPledges: Pledge[]) => {
     setPledges(newPledges);
     localStorage.setItem('sc_pledges', JSON.stringify(newPledges));
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const saveIssues = (newIssues: Issue[]) => {
-    setIssues(newIssues);
-    localStorage.setItem('sc_issues', JSON.stringify(newIssues));
     window.dispatchEvent(new Event('storage'));
   };
 
@@ -144,39 +195,44 @@ export default function AdminPage() {
     window.dispatchEvent(new Event('storage'));
   };
 
-  const handleDeleteIssue = (id: string) => {
-    if (confirm('이 이슈를 삭제하시겠습니까?')) {
-      saveIssues(issues.filter((i) => i.id !== id));
+  const handleDeleteIssue = async (id: number) => {
+    if (!confirm('이 제안을 삭제하시겠습니까?')) return;
+    try {
+      await deleteSuggestion(id);
+      setIssues((prev) => prev.filter((i) => i.id !== id));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : '삭제 중 오류가 발생했습니다.');
     }
   };
 
-  const handleAddComment = (issueId: string) => {
-    const text = commentDrafts[issueId]?.trim();
-    if (!text) return alert('답변 내용을 입력해 주세요.');
-
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
-
-    const updated = issues.map((i) => {
-      if (i.id === issueId) {
-        return {
-          ...i,
-          comments: [...i.comments, { id: Date.now(), author: '회장단', date: today, text }],
-        };
-      }
-      return i;
-    });
-
-    saveIssues(updated);
-    setCommentDrafts({ ...commentDrafts, [issueId]: '' });
-    alert('\'회장단\' 답변이 등록되었습니다.');
+  const handleSaveReply = async (issue: Suggestion) => {
+    const text = replyDrafts[issue.id]?.trim();
+    try {
+      const updated = await updateSuggestionStatus(issue.id, {
+        status: issue.status,
+        adminReply: text || null,
+      });
+      setIssues((prev) => prev.map((i) => (i.id === issue.id ? updated : i)));
+      alert('답변이 등록되었습니다.');
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : '답변 등록 중 오류가 발생했습니다.');
+    }
   };
 
-  const handleUpdateStatus = (issueId: string, newStatus: string) => {
-    saveIssues(issues.map((i) => (i.id === issueId ? { ...i, status: newStatus } : i)));
+  const handleUpdateStatus = async (issue: Suggestion, newStatus: Suggestion['status']) => {
+    try {
+      const updated = await updateSuggestionStatus(issue.id, {
+        status: newStatus,
+        adminReply: issue.adminReply,
+      });
+      setIssues((prev) => prev.map((i) => (i.id === issue.id ? updated : i)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : '상태 변경 중 오류가 발생했습니다.');
+    }
   };
 
   // ------------------------------------------------------------- //
-  // DataGSM 로그인 전
+  // 1. DataGSM 로그인 전
   // ------------------------------------------------------------- //
   if (!isDataGsmLogged) {
     return (
@@ -186,10 +242,7 @@ export default function AdminPage() {
           <p className="text-xs opacity-50">학생회 관리자만 접근할 수 있는 페이지입니다.</p>
           <button
             type="button"
-            onClick={() => {
-              sessionStorage.setItem('sc_oauth_return_to', '/admin');
-              login();
-            }}
+            onClick={() => startDataGsmLogin('/admin')}
             className={`w-full py-3.5 text-sm rounded-xl ${BTN_PRIMARY}`}
           >
             DataGSM 계정으로 로그인하기
@@ -199,10 +252,61 @@ export default function AdminPage() {
     );
   }
 
+  // ------------------------------------------------------------- //
+  // 2. 로그인 후, 내 계정의 임원 권한 확인 중
+  // ------------------------------------------------------------- //
+  if (!me) {
+    return (
+      <main className="min-h-[80vh] flex items-center justify-center px-4">
+        {meError ? (
+          <p className="text-sm text-red-500">{meError}</p>
+        ) : (
+          <p className="text-sm opacity-50">권한 확인 중...</p>
+        )}
+      </main>
+    );
+  }
+
+  // ------------------------------------------------------------- //
+  // 3. 로그인은 했지만 아직 관리자로 승격되지 않은 계정
+  // ------------------------------------------------------------- //
+  if (me.role !== 'ADMIN') {
+    return (
+      <main className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
+          <h1 className="text-xl font-bold">관리자 승격</h1>
+          <p className="text-xs opacity-50">
+            {me.name}님은 아직 관리자 권한이 없습니다. 학생회 담당 서버 관리자에게 전달받은 승격
+            코드를 입력해 주세요.
+          </p>
+          <form onSubmit={handlePromote} className="space-y-4">
+            <input
+              type="password"
+              placeholder="관리자 승격 코드를 입력하세요"
+              className={INPUT_CLASS}
+              value={promoteCode}
+              onChange={(e) => setPromoteCode(e.target.value)}
+              autoFocus
+            />
+            {promoteError && <p className="text-xs text-red-500 font-medium">{promoteError}</p>}
+            <button
+              type="submit"
+              disabled={promoting}
+              className={`w-full py-2.5 text-sm rounded-lg ${BTN_PRIMARY} disabled:opacity-50`}
+            >
+              {promoting ? '확인 중...' : '승격하기'}
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 pt-12 pb-24 space-y-8">
       <div className="pb-4 border-b border-black/10 dark:border-white/10">
         <h1 className="text-2xl font-bold">관리자 대시보드</h1>
+        <p className="text-xs opacity-50 mt-1">{me.name}님으로 로그인됨</p>
       </div>
 
       <div className="flex justify-between items-center border-b border-black/10 dark:border-white/10 pb-3 flex-wrap gap-3">
@@ -302,16 +406,25 @@ export default function AdminPage() {
 
       {activeTab === 'issues' && (
         <div className="space-y-6">
-          {issues.length === 0 ? (
-            <div className="min-h-[360px] flex items-center justify-center text-sm opacity-50">등록된 이슈가 없습니다.</div>
+          {issuesLoading ? (
+            <div className="min-h-[360px] flex items-center justify-center text-sm opacity-50">불러오는 중...</div>
+          ) : issuesError ? (
+            <div className="min-h-[360px] flex items-center justify-center text-sm text-red-500">{issuesError}</div>
+          ) : issues.length === 0 ? (
+            <div className="min-h-[360px] flex items-center justify-center text-sm opacity-50">등록된 제안이 없습니다.</div>
           ) : (
             issues.map((issue) => (
               <div key={issue.id} className="p-5 border border-black/10 dark:border-white/10 rounded-xl space-y-4 bg-white/70 dark:bg-white/5">
                 <div className="flex justify-between items-start gap-4">
                   <div>
-                    <span className="text-xs px-2 py-0.5 rounded-full border border-black/20 font-medium">{issue.status}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full border border-black/20 font-medium">
+                      {STATUS_LABELS[issue.status]}
+                    </span>
                     <h3 className="font-bold text-base mt-2">{issue.title}</h3>
-                    <p className="text-xs opacity-50 mt-0.5">{issue.dept} · {issue.author} · {issue.date}</p>
+                    <p className="text-xs opacity-50 mt-0.5">
+                      {issue.authorName}
+                      {issue.createdAt && ` · ${issue.createdAt.slice(0, 10)}`}
+                    </p>
                   </div>
                   <button
                     onClick={() => handleDeleteIssue(issue.id)}
@@ -321,33 +434,18 @@ export default function AdminPage() {
                   </button>
                 </div>
 
-                <p className="text-sm opacity-80 whitespace-pre-line">{issue.body}</p>
-
-                {issue.comments.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-black/10 dark:border-white/10">
-                    <span className="text-xs font-bold opacity-60">등록된 답변</span>
-                    {issue.comments.map((c) => (
-                      <div key={c.id} className="p-3 bg-white/70 dark:bg-white/5 rounded-lg text-xs space-y-1">
-                        <div className="flex justify-between font-bold">
-                          <span className="text-navy dark:text-blue-400">{c.author}</span>
-                          <span className="opacity-40">{c.date}</span>
-                        </div>
-                        <p>{c.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <p className="text-sm opacity-80 whitespace-pre-line">{issue.content}</p>
 
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="'회장단' 이름으로 답변 작성을 입력하세요"
+                    placeholder="학생회 답변을 입력하세요"
                     className="flex-1 p-2 text-xs border rounded-lg bg-transparent border-black/20 dark:border-white/20"
-                    value={commentDrafts[issue.id] || ''}
-                    onChange={(e) => setCommentDrafts({ ...commentDrafts, [issue.id]: e.target.value })}
+                    value={replyDrafts[issue.id] ?? ''}
+                    onChange={(e) => setReplyDrafts({ ...replyDrafts, [issue.id]: e.target.value })}
                   />
                   <button
-                    onClick={() => handleAddComment(issue.id)}
+                    onClick={() => handleSaveReply(issue)}
                     className={`px-4 py-2 text-xs rounded-lg ${BTN_PRIMARY}`}
                   >
                     답변 등록
@@ -359,14 +457,10 @@ export default function AdminPage() {
                   {STATUS_OPTIONS.map((status) => (
                     <button
                       key={status}
-                      onClick={() => handleUpdateStatus(issue.id, status)}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
-                        issue.status === status
-                          ? 'navy-surface dark:bg-blue-500 dark:bg-none text-white border-transparent dark:border-blue-500 shadow-sm'
-                          : 'border-black/20 dark:border-white/20 hover:bg-black/5 opacity-70'
-                      }`}
+                      onClick={() => handleUpdateStatus(issue, status)}
+                      className={statusButtonClass(issue.status === status)}
                     >
-                      {status}
+                      {STATUS_LABELS[status]}
                     </button>
                   ))}
                 </div>

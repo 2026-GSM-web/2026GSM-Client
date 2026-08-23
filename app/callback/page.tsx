@@ -2,86 +2,51 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useOAuth } from '@themoment-team/datagsm-oauth-react';
+import { OAUTH_RETURN_TO_KEY, startDataGsmLogin } from '@/lib/auth';
 
-// DataGSM OAuth 서버가 돌려주는 error 코드별 안내 문구
-const ERROR_MESSAGES: Record<string, string> = {
-  FRONTEND_OAUTH2_ERROR_REDIRECT_URI:
-    '로그인 연동 설정(redirect_uri)이 올바르지 않아 로그인을 완료할 수 없습니다. 관리자에게 문의해 주세요.',
-};
+// 백엔드가 로그인 실패 시 쿼리스트링으로 돌려줄 수 있는 error 코드별 안내 문구
+const ERROR_MESSAGES: Record<string, string> = {};
 
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, redirectUri, getCodeVerifier, clearVerifier } = useOAuth();
 
   const oauthError = searchParams.get('error');
-  const code = searchParams.get('code');
 
-  const [exchangeError, setExchangeError] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
 
   useEffect(() => {
     if (oauthError) return;
 
-    const exchangeCode = async () => {
-      if (!code) {
-        setExchangeError('인증 코드를 받지 못했습니다. 다시 로그인해 주세요.');
-        return;
-      }
+    // 백엔드가 school SSO 로그인을 끝낸 뒤 이 페이지로 `#token=<JWT>` 형태로 되돌려줌
+    // (해시는 서버로 전송되지 않으므로 클라이언트에서 직접 읽어야 함)
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const token = hashParams.get('token');
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_AUTH_API_URL;
-      if (!apiBaseUrl) {
-        // 백엔드 주소가 아직 설정되지 않음 - .env.example 참고
-        setExchangeError('로그인 서버 주소가 설정되지 않았습니다. 관리자에게 문의해 주세요.');
-        return;
-      }
+    if (!token) {
+      // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
+      const timer = setTimeout(() => {
+        setTokenError('로그인 응답에서 인증 정보를 찾지 못했습니다. 다시 로그인해 주세요.');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
 
-      try {
-        const res = await fetch(`${apiBaseUrl}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            authCode: code,
-            redirectUri,
-            codeVerifier: getCodeVerifier(),
-          }),
-        });
+    localStorage.setItem('sc_jwt', token);
 
-        if (!res.ok) {
-          throw new Error(`서버 응답 오류 (${res.status})`);
-        }
+    // 로그인을 어디서 시작했는지에 따라 되돌아갈 위치가 달라짐(정책 제안 작성 / 관리자
+    // 페이지 등). 로그인 시작 시 sessionStorage에 남겨둔 값을 읽고, 없으면 기존 기본
+    // 동작(정책 제안 작성 페이지)으로 이동
+    const returnTo = sessionStorage.getItem(OAUTH_RETURN_TO_KEY) || '/policies/create';
+    sessionStorage.removeItem(OAUTH_RETURN_TO_KEY);
+    router.replace(`${returnTo}?isLoggedIn=true`);
+  }, [oauthError, router]);
 
-        const data = await res.json();
-        const token = data.jwt ?? data.token ?? data.accessToken;
-        if (!token) {
-          throw new Error('응답에서 JWT를 찾을 수 없습니다.');
-        }
-
-        localStorage.setItem('sc_jwt', token);
-        clearVerifier();
-
-        // 로그인을 어디서 시작했는지에 따라 되돌아갈 위치가 달라짐(정책 제안 작성 / 관리자
-        // 페이지 등). 로그인 시작 시 sessionStorage에 남겨둔 값을 읽고, 없으면 기존 기본
-        // 동작(정책 제안 작성 페이지)으로 이동
-        const returnTo = sessionStorage.getItem('sc_oauth_return_to') || '/policies/create';
-        sessionStorage.removeItem('sc_oauth_return_to');
-        router.replace(`${returnTo}?isLoggedIn=true`);
-      } catch (err) {
-        setExchangeError(
-          err instanceof Error ? err.message : '로그인 처리 중 알 수 없는 오류가 발생했습니다.'
-        );
-      }
-    };
-
-    exchangeCode();
-  }, [oauthError, code, redirectUri, getCodeVerifier, clearVerifier, router]);
-
-  const error = oauthError ?? (exchangeError ? 'EXCHANGE_FAILED' : null);
+  const error = oauthError ?? tokenError;
 
   if (error) {
     const message = oauthError
       ? ERROR_MESSAGES[oauthError] || `로그인 중 오류가 발생했습니다. (${oauthError})`
-      : exchangeError!;
+      : error;
 
     return (
       <main className="min-h-screen flex items-center justify-center px-4">
@@ -93,7 +58,7 @@ function CallbackContent() {
           <div className="flex flex-col gap-2 pt-2">
             <button
               type="button"
-              onClick={() => login()}
+              onClick={() => startDataGsmLogin('/policies/create')}
               className="w-full py-2.5 navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold text-sm rounded-lg hover:brightness-110 dark:hover:bg-blue-400 transition"
             >
               다시 로그인하기

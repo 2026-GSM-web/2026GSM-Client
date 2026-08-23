@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { useOAuth } from '@themoment-team/datagsm-oauth-react';
+import { startDataGsmLogin } from '@/lib/auth';
 
 export default function CallbackError({
   error,
@@ -10,8 +10,6 @@ export default function CallbackError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
-  const { login } = useOAuth();
-
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -24,7 +22,7 @@ export default function CallbackError({
         <div className="flex flex-col gap-2 pt-1">
           <button
             type="button"
-            onClick={() => login()}
+            onClick={() => startDataGsmLogin('/policies/create')}
             className="w-full py-2.5 navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold text-sm rounded-lg hover:brightness-110 dark:hover:bg-blue-400 transition"
           >
             다시 로그인하기
