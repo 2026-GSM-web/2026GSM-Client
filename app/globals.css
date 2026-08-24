@@ -41,6 +41,20 @@ body {
   background-color: rgba(37, 99, 235, 0.3);
 }
 
+/* Tailwind v4는 브라우저 기본값(버튼 cursor: default)을 그대로 두기 때문에,
+   클릭 가능한 요소를 마우스로 가리켜도 커서가 손가락 모양으로 바뀌지 않아
+   클릭 가능 여부를 알아채기 어려움 - 명시적으로 pointer를 지정함 */
+button:not(:disabled),
+[role='button'],
+select,
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 :focus-visible {
   outline: none;
 }
