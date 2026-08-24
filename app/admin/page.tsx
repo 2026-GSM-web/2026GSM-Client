@@ -11,7 +11,9 @@ import {
   deleteSuggestion,
   getAllSuggestions,
   getMe,
+  getPledgeProgress,
   promoteToAdmin,
+  updatePledgeProgress,
   updateSuggestionStatus,
   UserInfo,
 } from '@/lib/api';
@@ -83,13 +85,22 @@ function AdminPageContent() {
     return loadPledgesFromStorage();
   });
 
-  const [progressPercent, setProgressPercent] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    const saved = localStorage.getItem('sc_progress_percent');
-    const parsed = saved ? Number(saved) : 0;
-    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
-  });
-  const [percentInput, setPercentInput] = useState(String(progressPercent));
+  // 공약 이행률(%) - 실제 백엔드 연동 (/api/pledge-progress)
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [percentInput, setPercentInput] = useState('0');
+  const [percentSaving, setPercentSaving] = useState(false);
+  const [percentError, setPercentError] = useState('');
+
+  useEffect(() => {
+    getPledgeProgress()
+      .then((data) => {
+        setProgressPercent(data.percentage);
+        setPercentInput(String(data.percentage));
+      })
+      .catch(() => {
+        // 조회 실패 시 기본값(0)을 그대로 두고 저장 시 다시 시도하도록 함
+      });
+  }, []);
 
   // 정책 제안(건의사항) - 실제 백엔드 연동
   const [issues, setIssues] = useState<Suggestion[]>([]);
@@ -127,12 +138,19 @@ function AdminPageContent() {
     window.dispatchEvent(new Event('storage'));
   };
 
-  const handleSavePercent = () => {
+  const handleSavePercent = async () => {
     const value = Math.min(100, Math.max(0, Math.round(Number(percentInput) || 0)));
-    setProgressPercent(value);
-    setPercentInput(String(value));
-    localStorage.setItem('sc_progress_percent', String(value));
-    window.dispatchEvent(new Event('storage'));
+    setPercentSaving(true);
+    setPercentError('');
+    try {
+      const updated = await updatePledgeProgress(value);
+      setProgressPercent(updated.percentage);
+      setPercentInput(String(updated.percentage));
+    } catch (err) {
+      setPercentError(err instanceof ApiError ? err.message : '이행률 저장 중 오류가 발생했습니다.');
+    } finally {
+      setPercentSaving(false);
+    }
   };
 
   const handleDeletePledge = (pledgeId: string) => {
@@ -319,11 +337,13 @@ function AdminPageContent() {
               <span className="text-sm opacity-50">%</span>
               <button
                 onClick={handleSavePercent}
-                className={`px-4 py-2 text-xs rounded-lg ${BTN_PRIMARY}`}
+                disabled={percentSaving}
+                className={`px-4 py-2 text-xs rounded-lg ${BTN_PRIMARY} disabled:opacity-50`}
               >
-                저장
+                {percentSaving ? '저장 중...' : '저장'}
               </button>
             </div>
+            {percentError && <p className="text-xs text-red-500 font-medium">{percentError}</p>}
           </div>
 
           <div className="space-y-3">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Pledge, defaultPledges, loadPledgesFromStorage } from '@/lib/pledges';
+import { getPledgeProgress } from '@/lib/api';
 
 // 학생회 조직 - 실제 명단
 const PRESIDENT = { role: '학생회장', name: '한의준' };
@@ -41,12 +42,6 @@ export default function MainPage() {
     const timer = setTimeout(() => {
       setPledges(loadPledgesFromStorage());
 
-      const savedPercent = localStorage.getItem('sc_progress_percent');
-      if (savedPercent !== null) {
-        const parsed = Number(savedPercent);
-        if (Number.isFinite(parsed)) setProgressPercent(Math.min(100, Math.max(0, parsed)));
-      }
-
       const now = new Date();
       setUpdatedAt(`${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}`);
 
@@ -63,21 +58,21 @@ export default function MainPage() {
   }, []);
 
   useEffect(() => {
-    const handleStorageChange = () => {
-      setPledges(loadPledgesFromStorage());
-
-      const savedPercent = localStorage.getItem('sc_progress_percent');
-      if (savedPercent !== null) {
-        const parsedPercent = Number(savedPercent);
-        if (Number.isFinite(parsedPercent)) {
-          setProgressPercent(Math.min(100, Math.max(0, parsedPercent)));
-        }
-      }
-    };
+    const handleStorageChange = () => setPledges(loadPledgesFromStorage());
 
     window.addEventListener('storage', handleStorageChange);
 
     return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  useEffect(() => {
+    // 이행률(%)은 모든 방문자에게 동일하게 보여야 해서 localStorage가 아닌
+    // 백엔드(/api/pledge-progress)에서 조회함
+    getPledgeProgress()
+      .then((data) => setProgressPercent(data.percentage))
+      .catch(() => {
+        // 조회 실패 시 초기값(0)을 그대로 표시
+      });
   }, []);
 
   // 스크롤 트리거 애니메이션 - clip-path가 없는 .reveal 섹션만 관찰하고,

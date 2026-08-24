@@ -43,6 +43,11 @@ export interface UserInfo {
   role: 'USER' | 'ADMIN';
 }
 
+export interface PledgeProgress {
+  percentage: number;
+  updatedAt: string | null;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -133,4 +138,15 @@ export function updateSuggestionStatus(
 
 export function deleteSuggestion(id: number) {
   return apiFetch<void>(`/api/suggestions/${id}`, { method: 'DELETE' });
+}
+
+export function getPledgeProgress() {
+  return apiFetch<PledgeProgress>('/api/pledge-progress');
+}
+
+export function updatePledgeProgress(percentage: number) {
+  return apiFetch<PledgeProgress>('/api/pledge-progress', {
+    method: 'PUT',
+    body: JSON.stringify({ percentage }),
+  });
 }
