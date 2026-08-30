@@ -5,19 +5,26 @@ import { useSearchParams } from 'next/navigation';
 import { startDataGsmLogin } from '@/lib/auth';
 import {
   ApiError,
+  Pledge,
+  PLEDGE_STATUS_LABELS,
+  PLEDGE_STATUS_OPTIONS,
+  PledgeStatus,
   STATUS_LABELS,
   STATUS_OPTIONS,
   Suggestion,
+  createPledge,
+  deletePledge,
   deleteSuggestion,
   getAllSuggestions,
   getMe,
   getPledgeProgress,
+  getPledges,
   promoteToAdmin,
+  updatePledge,
   updatePledgeProgress,
   updateSuggestionStatus,
   UserInfo,
 } from '@/lib/api';
-import { Pledge, PledgeStatus, STATUS_VALUES, loadPledgesFromStorage } from '@/lib/pledges';
 
 const BTN_PRIMARY =
   'navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold hover:brightness-110 dark:hover:bg-blue-400 active:brightness-90 active:scale-95 transition';
@@ -80,10 +87,23 @@ function AdminPageContent() {
 
   const [activeTab, setActiveTab] = useState<'pledges' | 'issues'>('pledges');
 
-  const [pledges, setPledges] = useState<Pledge[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return loadPledgesFromStorage();
-  });
+  // 공약 목록 - 실제 백엔드 연동 (/api/pledges)
+  const [pledges, setPledges] = useState<Pledge[]>([]);
+  const [pledgesLoading, setPledgesLoading] = useState(true);
+  const [pledgesError, setPledgesError] = useState('');
+  const [newPledgeTitle, setNewPledgeTitle] = useState('');
+  const [newPledgeContent, setNewPledgeContent] = useState('');
+  const [creatingPledge, setCreatingPledge] = useState(false);
+  const [createPledgeError, setCreatePledgeError] = useState('');
+
+  useEffect(() => {
+    getPledges()
+      .then(setPledges)
+      .catch((err) => {
+        setPledgesError(err instanceof ApiError ? err.message : '공약 목록을 불러오지 못했습니다.');
+      })
+      .finally(() => setPledgesLoading(false));
+  }, []);
 
   // 공약 이행률(%) - 실제 백엔드 연동 (/api/pledge-progress)
   const [progressPercent, setProgressPercent] = useState(0);
@@ -132,12 +152,6 @@ function AdminPageContent() {
     return () => clearTimeout(timer);
   }, [me, activeTab]);
 
-  const savePledges = (newPledges: Pledge[]) => {
-    setPledges(newPledges);
-    localStorage.setItem('sc_pledges', JSON.stringify(newPledges));
-    window.dispatchEvent(new Event('storage'));
-  };
-
   const handleSavePercent = async () => {
     const value = Math.min(100, Math.max(0, Math.round(Number(percentInput) || 0)));
     setPercentSaving(true);
@@ -153,31 +167,102 @@ function AdminPageContent() {
     }
   };
 
-  const handleDeletePledge = (pledgeId: string) => {
-    if (confirm('이 공약을 삭제하시겠습니까?')) {
-      savePledges(pledges.filter((p) => p.id !== pledgeId));
+  const handleDeletePledge = async (pledgeId: number) => {
+    if (!confirm('이 공약을 삭제하시겠습니까?')) return;
+    try {
+      await deletePledge(pledgeId);
+      setPledges((prev) => prev.filter((p) => p.id !== pledgeId));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : '삭제 중 오류가 발생했습니다.');
     }
   };
 
-  const handleResetPledges = () => {
-    if (confirm('모든 공약을 \'진행 중\' 상태로 초기화하시겠습니까?')) {
-      const resetPledges = pledges.map((p) => ({ ...p, status: '진행 중' as PledgeStatus, subStatus: '' }));
-      savePledges(resetPledges);
+  const handleResetPledges = async () => {
+    if (!confirm('모든 공약을 \'진행 중\' 상태로 초기화하시겠습니까?')) return;
+    try {
+      const reset = await Promise.all(
+        pledges.map((p) =>
+          updatePledge(p.id, {
+            title: p.title,
+            content: p.content,
+            category: p.category,
+            status: 'IN_PROGRESS',
+            subStatus: '',
+            displayOrder: p.displayOrder,
+          })
+        )
+      );
+      setPledges(reset);
       alert('공약 진행 상황이 초기화되었습니다.');
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : '초기화 중 오류가 발생했습니다.');
     }
   };
 
-  const handleUpdatePledgeStatus = (pledgeId: string, status: PledgeStatus) => {
-    savePledges(pledges.map((p) => (p.id === pledgeId ? { ...p, status } : p)));
+  const handleUpdatePledgeStatus = async (pledge: Pledge, status: PledgeStatus) => {
+    const prevPledges = pledges;
+    setPledges((prev) => prev.map((p) => (p.id === pledge.id ? { ...p, status } : p)));
+    try {
+      const updated = await updatePledge(pledge.id, {
+        title: pledge.title,
+        content: pledge.content,
+        category: pledge.category,
+        status,
+        subStatus: pledge.subStatus,
+        displayOrder: pledge.displayOrder,
+      });
+      setPledges((prev) => prev.map((p) => (p.id === pledge.id ? updated : p)));
+    } catch (err) {
+      setPledges(prevPledges);
+      alert(err instanceof ApiError ? err.message : '상태 변경 중 오류가 발생했습니다.');
+    }
   };
 
-  const handleUpdatePledgeSubStatus = (pledgeId: string, subStatus: string) => {
-    setPledges(pledges.map((p) => (p.id === pledgeId ? { ...p, subStatus } : p)));
+  const handleUpdatePledgeSubStatus = (pledgeId: number, subStatus: string) => {
+    setPledges((prev) => prev.map((p) => (p.id === pledgeId ? { ...p, subStatus } : p)));
   };
 
-  const handleBlurPledgeSubStatus = () => {
-    localStorage.setItem('sc_pledges', JSON.stringify(pledges));
-    window.dispatchEvent(new Event('storage'));
+  const handleBlurPledgeSubStatus = async (pledge: Pledge) => {
+    try {
+      const updated = await updatePledge(pledge.id, {
+        title: pledge.title,
+        content: pledge.content,
+        category: pledge.category,
+        status: pledge.status,
+        subStatus: pledge.subStatus,
+        displayOrder: pledge.displayOrder,
+      });
+      setPledges((prev) => prev.map((p) => (p.id === pledge.id ? updated : p)));
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : '공약 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleCreatePledge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPledgeTitle.trim() || !newPledgeContent.trim()) {
+      return alert('제목과 내용을 입력해주세요.');
+    }
+
+    setCreatingPledge(true);
+    setCreatePledgeError('');
+    try {
+      const nextOrder = pledges.length > 0 ? Math.max(...pledges.map((p) => p.displayOrder)) + 1 : 1;
+      const created = await createPledge({
+        title: newPledgeTitle.trim(),
+        content: newPledgeContent.trim(),
+        status: 'IN_PROGRESS',
+        subStatus: '',
+        displayOrder: nextOrder,
+      });
+      setPledges((prev) => [...prev, created]);
+      setNewPledgeTitle('');
+      setNewPledgeContent('');
+    } catch (err) {
+      setCreatePledgeError(err instanceof ApiError ? err.message : '공약 추가 중 오류가 발생했습니다.');
+    } finally {
+      setCreatingPledge(false);
+    }
   };
 
   const handleDeleteIssue = async (id: number) => {
@@ -348,46 +433,82 @@ function AdminPageContent() {
 
           <div className="space-y-3">
           <p className="text-xs opacity-50">상태와 진행 상황 문구는 대시보드의 이행 현황 목록에 그대로 표시돼요.</p>
-          {pledges.map((p) => (
-            <div
-              key={p.id}
-              className="flex flex-col gap-3 p-4 border border-black/10 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5"
-            >
-              <span className="font-bold text-sm">{p.title}</span>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <input
-                  type="text"
-                  placeholder="진행 상황 (예: 3월 시행 완료)"
-                  value={p.subStatus}
-                  onChange={(e) => handleUpdatePledgeSubStatus(p.id, e.target.value)}
-                  onBlur={handleBlurPledgeSubStatus}
-                  className={`${INPUT_CLASS} sm:flex-1`}
-                />
+          {pledgesLoading ? (
+            <div className="min-h-30 flex items-center justify-center text-sm opacity-50">불러오는 중...</div>
+          ) : pledgesError ? (
+            <div className="min-h-30 flex items-center justify-center text-sm text-red-500">{pledgesError}</div>
+          ) : (
+            pledges.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-col gap-3 p-4 border border-black/10 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5"
+              >
+                <span className="font-bold text-sm">{p.title}</span>
 
-                <select
-                  value={p.status}
-                  onChange={(e) => handleUpdatePledgeStatus(p.id, e.target.value as PledgeStatus)}
-                  className="p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400 shrink-0"
-                >
-                  {STATUS_VALUES.map((status) => (
-                    <option key={status} value={status} className="text-black">
-                      {status}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="진행 상황 (예: 3월 시행 완료)"
+                    value={p.subStatus ?? ''}
+                    onChange={(e) => handleUpdatePledgeSubStatus(p.id, e.target.value)}
+                    onBlur={() => handleBlurPledgeSubStatus(p)}
+                    className={`${INPUT_CLASS} sm:flex-1`}
+                  />
 
-                <button
-                  type="button"
-                  onClick={() => handleDeletePledge(p.id)}
-                  className="px-2 py-1 bg-red-500/10 text-red-600 text-xs font-semibold rounded-md hover:bg-red-500/20 transition shrink-0"
-                >
-                  삭제
-                </button>
+                  <select
+                    value={p.status}
+                    onChange={(e) => handleUpdatePledgeStatus(p, e.target.value as PledgeStatus)}
+                    className="p-2.5 text-sm border rounded-lg bg-transparent border-black/20 dark:border-white/20 focus:outline-navy dark:focus:outline-blue-400 shrink-0"
+                  >
+                    {PLEDGE_STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status} className="text-black">
+                        {PLEDGE_STATUS_LABELS[status]}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePledge(p.id)}
+                    className="px-2 py-1 bg-red-500/10 text-red-600 text-xs font-semibold rounded-md hover:bg-red-500/20 transition shrink-0"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
           </div>
+
+          <form
+            onSubmit={handleCreatePledge}
+            className="p-4 border border-dashed border-black/20 dark:border-white/20 rounded-xl space-y-3"
+          >
+            <span className="text-sm font-bold">+ 새 공약 추가</span>
+            <input
+              type="text"
+              placeholder="공약 제목"
+              value={newPledgeTitle}
+              onChange={(e) => setNewPledgeTitle(e.target.value)}
+              className={INPUT_CLASS}
+            />
+            <textarea
+              placeholder="공약 내용"
+              rows={3}
+              value={newPledgeContent}
+              onChange={(e) => setNewPledgeContent(e.target.value)}
+              className={INPUT_CLASS}
+            />
+            {createPledgeError && <p className="text-xs text-red-500 font-medium">{createPledgeError}</p>}
+            <button
+              type="submit"
+              disabled={creatingPledge}
+              className={`px-4 py-2 text-xs rounded-lg ${BTN_PRIMARY} disabled:opacity-50`}
+            >
+              {creatingPledge ? '추가 중...' : '공약 추가'}
+            </button>
+          </form>
         </div>
       )}
 

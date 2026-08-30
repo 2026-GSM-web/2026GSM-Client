@@ -48,6 +48,37 @@ export interface PledgeProgress {
   updatedAt: string | null;
 }
 
+export type PledgeStatus = 'IN_PROGRESS' | 'PILOT' | 'COMPLETED';
+
+export const PLEDGE_STATUS_LABELS: Record<PledgeStatus, string> = {
+  IN_PROGRESS: '진행 중',
+  PILOT: '시범 운영 중',
+  COMPLETED: '완료',
+};
+
+export const PLEDGE_STATUS_OPTIONS: PledgeStatus[] = ['IN_PROGRESS', 'PILOT', 'COMPLETED'];
+
+export interface Pledge {
+  id: number;
+  title: string;
+  content: string;
+  category: string | null;
+  status: PledgeStatus;
+  subStatus: string | null;
+  displayOrder: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PledgeInput {
+  title: string;
+  content: string;
+  category?: string | null;
+  status: PledgeStatus;
+  subStatus?: string | null;
+  displayOrder: number;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -83,8 +114,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, `요청이 실패했습니다. (${res.status})`);
   }
 
+  // 공약 삭제(DELETE /api/pledges/{id})처럼 204가 아니라 200 + 빈 바디로 오는
+  // 경우도 있어서, 상태 코드 대신 실제 바디 유무로 파싱 여부를 판단함
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export function getMe() {
@@ -149,4 +183,26 @@ export function updatePledgeProgress(percentage: number) {
     method: 'PUT',
     body: JSON.stringify({ percentage }),
   });
+}
+
+export function getPledges() {
+  return apiFetch<Pledge[]>('/api/pledges');
+}
+
+export function createPledge(data: PledgeInput) {
+  return apiFetch<Pledge>('/api/pledges', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updatePledge(id: number, data: PledgeInput) {
+  return apiFetch<Pledge>(`/api/pledges/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deletePledge(id: number) {
+  return apiFetch<void>(`/api/pledges/${id}`, { method: 'DELETE' });
 }
