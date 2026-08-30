@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Pledge, defaultPledges, loadPledgesFromStorage } from '@/lib/pledges';
-import { getPledgeProgress } from '@/lib/api';
+import { Pledge, PLEDGE_STATUS_LABELS, getPledgeProgress, getPledges } from '@/lib/api';
 
 // 학생회 조직 - 실제 명단
 const PRESIDENT = { role: '학생회장', name: '한의준' };
@@ -28,20 +27,17 @@ export default function MainPage() {
   // localStorage/Date 등 클라이언트에서만 알 수 있는 값은 마운트 후 useEffect에서
   // 갱신함 - useState 초기화 함수 안에서 typeof window로 분기하면 SSR과 클라이언트
   // 첫 렌더 결과가 달라져 하이드레이션 mismatch가 발생함
-  const [pledges, setPledges] = useState<Pledge[]>(defaultPledges);
+  const [pledges, setPledges] = useState<Pledge[]>([]);
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [updatedAt, setUpdatedAt] = useState('');
   // 학생회 출범일(2026.07.16) 기준 D-day
   const [ddayText, setDdayText] = useState('');
 
   useEffect(() => {
-    // localStorage 값은 브라우저에서만 읽을 수 있어 마운트 후에만 반영 가능함 -
-    // useState 초기값으로 옮기면 SSR과 값이 달라져 하이드레이션 mismatch가 재발함.
-    // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
-    // (admin 페이지의 loadIssues와 동일한 패턴)
+    // Date 값은 서버/클라이언트 첫 렌더가 달라 하이드레이션 mismatch가 나므로
+    // 마운트 후에만 계산함. ESLint react-hooks/set-state-in-effect 경고를
+    // 회피하기 위해 한 스텝 지연 (admin 페이지의 loadIssues와 동일한 패턴)
     const timer = setTimeout(() => {
-      setPledges(loadPledgesFromStorage());
-
       const now = new Date();
       setUpdatedAt(`${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}`);
 
@@ -58,16 +54,14 @@ export default function MainPage() {
   }, []);
 
   useEffect(() => {
-    const handleStorageChange = () => setPledges(loadPledgesFromStorage());
+    // 공약 목록/이행률(%)은 모든 방문자에게 동일하게 보여야 해서 localStorage가
+    // 아닌 백엔드(/api/pledges, /api/pledge-progress)에서 조회함
+    getPledges()
+      .then(setPledges)
+      .catch(() => {
+        // 조회 실패 시 빈 목록을 그대로 표시
+      });
 
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  useEffect(() => {
-    // 이행률(%)은 모든 방문자에게 동일하게 보여야 해서 localStorage가 아닌
-    // 백엔드(/api/pledge-progress)에서 조회함
     getPledgeProgress()
       .then((data) => setProgressPercent(data.percentage))
       .catch(() => {
@@ -103,7 +97,7 @@ export default function MainPage() {
     return () => observer.disconnect();
   }, []);
 
-  const completedCount = pledges.filter((p) => p.status === '완료').length;
+  const completedCount = pledges.filter((p) => p.status === 'COMPLETED').length;
 
   return (
     <main>
@@ -248,7 +242,7 @@ export default function MainPage() {
                 </div>
               </div>
               <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-navy/10 text-navy border border-navy/20 dark:bg-blue-400/10 dark:text-blue-300 dark:border-blue-400/30">
-                {p.status}
+                {PLEDGE_STATUS_LABELS[p.status]}
               </span>
             </div>
           ))}
