@@ -23,15 +23,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" suppressHydrationWarning className={pretendard.variable}>
-      <body className="font-[family-name:var(--font-pretendard)] min-h-screen flex flex-col">
+      <body className="font-(family-name:--font-pretendard) min-h-screen flex flex-col">
         <Providers>
           <AuthProvider>
             <Header />
             {/* 콘텐츠가 짧아도 푸터가 화면 중간에 뜨지 않고 항상 맨 아래에 붙도록.
-                [&>*]:w-full: 안 넣으면 각 페이지 <main>이 mx-auto 때문에 stretch 대신
+                *:w-full: 안 넣으면 각 페이지 <main>이 mx-auto 때문에 stretch 대신
                 content-fit으로 줄어들어서(플렉스 아이템 + auto 마진 조합의 스펙 동작)
                 넓은 화면에서 좁게 눌린 것처럼 보이는 버그가 생김 */}
-            <div className="flex-1 flex flex-col [&>*]:w-full">{children}</div>
+            <div className="flex-1 flex flex-col *:w-full">{children}</div>
             <Footer />
           </AuthProvider>
         </Providers>

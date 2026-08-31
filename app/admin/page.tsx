@@ -390,7 +390,7 @@ export default function AdminPage() {
                 max={100}
                 value={percentInput}
                 onChange={(e) => setPercentInput(e.target.value)}
-                className={`${INPUT_CLASS} max-w-[100px]`}
+                className={`${INPUT_CLASS} max-w-25`}
               />
               <span className="text-sm opacity-50">%</span>
               <button
@@ -488,11 +488,11 @@ export default function AdminPage() {
       {activeTab === 'issues' && (
         <div className="space-y-6">
           {issuesLoading ? (
-            <div className="min-h-[360px] flex items-center justify-center text-sm opacity-50">불러오는 중...</div>
+            <div className="min-h-90 flex items-center justify-center text-sm opacity-50">불러오는 중...</div>
           ) : issuesError ? (
-            <div className="min-h-[360px] flex items-center justify-center text-sm text-red-500">{issuesError}</div>
+            <div className="min-h-90 flex items-center justify-center text-sm text-red-500">{issuesError}</div>
           ) : issues.length === 0 ? (
-            <div className="min-h-[360px] flex items-center justify-center text-sm opacity-50">등록된 제안이 없습니다.</div>
+            <div className="min-h-90 flex items-center justify-center text-sm opacity-50">등록된 제안이 없습니다.</div>
           ) : (
             issues.map((issue) => (
               <div key={issue.id} className="p-5 border border-black/10 dark:border-white/10 rounded-xl space-y-4 bg-white/70 dark:bg-white/5">
