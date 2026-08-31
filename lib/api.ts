@@ -87,12 +87,6 @@ export class ApiError extends Error {
   }
 }
 
-function authHeader(): HeadersInit {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('sc_jwt');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_AUTH_API_URL;
   if (!apiBaseUrl) {
@@ -101,9 +95,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   const res = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
+    // 인증이 ACCESS_TOKEN httpOnly 쿠키(SameSite=None)로 이뤄지므로, 다른 origin인
+    // 백엔드로 보내는 요청에도 브라우저가 쿠키를 실어 보내도록 credentials를 명시해야 함
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...authHeader(),
       ...(init?.headers ?? {}),
     },
   });

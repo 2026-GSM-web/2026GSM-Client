@@ -1,7 +1,10 @@
-// 실제 백엔드(school.https.gsmsv.site) 로그인은 Spring Security의 기본 OAuth2 클라이언트
-// 엔드포인트(/oauth2/authorization/school)로 그냥 풀 페이지 리다이렉트하면 되는 구조.
-// 백엔드가 DataGSM SSO 로그인까지 알아서 처리한 뒤, 서버에 미리 설정된 프론트엔드 주소로
-// `#token=<JWT>` 형태로 되돌려준다(스웨거 설명 기준). PKCE 코드 교환 같은 절차는 필요 없음.
+// 백엔드(school.https.gsmsv.site)가 DG(DataGSM) SSO 리다이렉트 체인을 직접 소유한다.
+// 프론트는 GET /api/auth/dg/authorize로 풀 페이지 리다이렉트만 하면 되고, code/state를
+// 다루거나 토큰을 저장할 책임이 없다 - Spring Security의 기본 oauth2Login 엔드포인트
+// (/oauth2/authorization/{registrationId})가 아니라 백엔드가 자체 소유한 경로다.
+// 로그인 성공 시 백엔드는 ACCESS_TOKEN을 httpOnly 쿠키로 설정한 뒤 콜백 페이지로
+// 리다이렉트한다(URL에 토큰이 실리지 않음 - httpOnly라 JS로 읽을 수도 없음). 실제 로그인
+// 여부는 콜백 페이지에서 쿠키를 자동으로 실어 보내는 /api/auth/me 호출로 확인한다.
 export const OAUTH_RETURN_TO_KEY = 'sc_oauth_return_to';
 
 export function startDataGsmLogin(returnTo: string) {
@@ -14,5 +17,5 @@ export function startDataGsmLogin(returnTo: string) {
   // 로그인 후 돌아갈 위치를 기억해둠 - 백엔드 리다이렉트는 고정된 한 주소로만 오기 때문에,
   // 실제 이동은 콜백 페이지에서 이 값을 읽어 처리함
   sessionStorage.setItem(OAUTH_RETURN_TO_KEY, returnTo);
-  window.location.href = `${apiBaseUrl}/oauth2/authorization/school`;
+  window.location.href = `${apiBaseUrl}/api/auth/dg/authorize`;
 }
