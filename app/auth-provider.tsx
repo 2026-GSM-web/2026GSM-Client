@@ -2,11 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { ApiError, getMe, UserInfo } from '@/lib/api';
-import { AUTH_CHANGE_EVENT, clearToken, getToken } from '@/lib/auth';
 
-// 'loading' : 아직 토큰 확인/검증 중 (SSR·첫 렌더는 항상 이 값)
-// 'authed'  : 유효한 토큰으로 /api/auth/me 조회까지 성공
-// 'guest'   : 토큰이 없거나 만료됨
+// 'loading' : 아직 로그인 여부 확인 중 (SSR·첫 렌더는 항상 이 값)
+// 'authed'  : ACCESS_TOKEN 쿠키로 /api/auth/me 조회까지 성공
+// 'guest'   : 쿠키가 없거나 만료됨(= /api/auth/me 가 401)
 type AuthStatus = 'loading' | 'authed' | 'guest';
 
 interface AuthContextValue {
@@ -25,27 +24,20 @@ export function useAuth(): AuthContextValue {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // localStorage는 서버에 없으므로 첫 렌더는 무조건 'loading'으로 시작해서
-  // 하이드레이션 mismatch를 피함 (app/page.tsx 등에서 쓰는 패턴과 동일)
+  // 인증은 httpOnly 쿠키(JS로 못 읽음)로 이뤄지므로, 로그인 여부는 오직 /api/auth/me
+  // 응답으로만 알 수 있음. SSR에는 쿠키가 없으니 첫 렌더는 무조건 'loading'으로 시작.
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<UserInfo | null>(null);
 
   const check = useCallback(async () => {
-    if (!getToken()) {
-      setUser(null);
-      setStatus('guest');
-      return;
-    }
-
     try {
       const me = await getMe();
       setUser(me);
       setStatus('authed');
     } catch (err) {
-      // 토큰은 있지만 만료/무효 - apiFetch가 401에서 이미 토큰을 지우지만,
-      // 네트워크 오류 등 다른 실패도 일단 로그아웃 상태로 떨어뜨림
-      if (err instanceof ApiError && err.status === 401) {
-        clearToken();
+      // 401(비로그인/만료)뿐 아니라 네트워크 오류 등 다른 실패도 일단 게스트로 떨어뜨림
+      if (!(err instanceof ApiError) || err.status !== 401) {
+        console.warn('[auth] /api/auth/me 확인 실패:', err);
       }
       setUser(null);
       setStatus('guest');
@@ -55,17 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // 마운트 직후 1회 확인. 이펙트 본문에서 곧바로 setState 하는 걸 피하려고 한 스텝 지연
     const timer = setTimeout(check, 0);
-
-    // 같은 탭의 로그인/로그아웃(AUTH_CHANGE_EVENT) + 다른 탭의 변경('storage')에 반응
-    const onChange = () => check();
-    window.addEventListener(AUTH_CHANGE_EVENT, onChange);
-    window.addEventListener('storage', onChange);
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener(AUTH_CHANGE_EVENT, onChange);
-      window.removeEventListener('storage', onChange);
-    };
+    return () => clearTimeout(timer);
   }, [check]);
 
   return (

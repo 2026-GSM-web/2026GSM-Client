@@ -1,8 +1,6 @@
 // school.https.gsmsv.site 백엔드 API 클라이언트.
 // 스웨거(https://school.https.gsmsv.site/swagger-ui/index.html) 기준으로 작성함.
 
-import { clearToken, getToken } from './auth';
-
 export type SuggestionStatus = 'RECEIVED' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
 
 export const STATUS_LABELS: Record<SuggestionStatus, string> = {
@@ -89,11 +87,6 @@ export class ApiError extends Error {
   }
 }
 
-function authHeader(): HeadersInit {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_AUTH_API_URL;
   if (!apiBaseUrl) {
@@ -102,19 +95,17 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   const res = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
+    // 인증이 ACCESS_TOKEN httpOnly 쿠키(SameSite=None)로 이뤄지므로, 다른 origin인
+    // 백엔드로 보내는 요청에도 브라우저가 쿠키를 실어 보내도록 credentials를 명시해야 함
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...authHeader(),
       ...(init?.headers ?? {}),
     },
   });
 
   if (!res.ok) {
-    if (res.status === 401) {
-      // 토큰이 만료/무효 - 정리하면 AUTH_CHANGE_EVENT가 발생해 앱 전역이 로그아웃 상태로 전환됨
-      clearToken();
-      throw new ApiError(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.');
-    }
+    if (res.status === 401) throw new ApiError(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.');
     if (res.status === 403) throw new ApiError(403, '이 작업을 수행할 권한이 없습니다.');
     throw new ApiError(res.status, `요청이 실패했습니다. (${res.status})`);
   }

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/auth-provider';
-import { logout, startDataGsmLogin } from '@/lib/auth';
+import { startDataGsmLogin } from '@/lib/auth';
 
 export default function Header() {
   const pathname = usePathname();
@@ -141,17 +141,9 @@ export default function Header() {
             )}
           </button>
 
-          {/* 로그인/로그아웃 - 토큰 검증이 끝난(mounted + loading 아님) 뒤에만 노출해
-              깜빡임을 막음 */}
-          {mounted && status === 'authed' && (
-            <button
-              type="button"
-              onClick={() => logout('/')}
-              className={linkClass}
-            >
-              로그아웃
-            </button>
-          )}
+          {/* 로그인 - /api/auth/me 확인이 끝난(mounted + loading 아님) 뒤에만 노출해
+              깜빡임을 막음. 로그아웃은 백엔드에 세션 종료 엔드포인트가 없고 ACCESS_TOKEN이
+              httpOnly 쿠키라 프론트에서 지울 수 없어 아직 미제공 (TODO: 백엔드 로그아웃 API) */}
           {mounted && status === 'guest' && (
             <button
               type="button"
