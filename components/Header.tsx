@@ -4,10 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/app/auth-provider';
+import { startDataGsmLogin } from '@/lib/auth';
 
 export default function Header() {
   const pathname = usePathname();
   const { setTheme, resolvedTheme } = useTheme();
+  const { status } = useAuth();
   const [mounted, setMounted] = useState(false);
   // 홈 화면 맨 위(히어로 사진 위)에 있을 때는 헤더가 사진과 이어지도록 투명하게,
   // 스크롤하면 흰색(라이트 모드) 또는 네이비(다크 모드)로 전환
@@ -137,6 +140,18 @@ export default function Header() {
               </svg>
             )}
           </button>
+
+          {/* 로그인 - /api/auth/me 확인이 끝난(mounted + loading 아님) 뒤에만 노출해
+              깜빡임을 막음. 개인 기기 전제라 로그아웃은 두지 않음(토큰 만료로 자연 정리) */}
+          {mounted && status === 'guest' && (
+            <button
+              type="button"
+              onClick={() => startDataGsmLogin(pathname || '/')}
+              className={linkClass}
+            >
+              로그인
+            </button>
+          )}
 
           <Link
             href="/policies/create"

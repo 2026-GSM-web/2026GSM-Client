@@ -33,7 +33,9 @@ function CallbackContent() {
         // 동작(정책 제안 작성 페이지)으로 이동
         const returnTo = sessionStorage.getItem(OAUTH_RETURN_TO_KEY) || '/policies/create';
         sessionStorage.removeItem(OAUTH_RETURN_TO_KEY);
-        router.replace(`${returnTo}?isLoggedIn=true`);
+        // 풀 페이지 이동으로 AuthProvider가 다시 마운트되며 /api/auth/me로 로그인
+        // 상태를 새로 확인하게 함 (SPA 라우팅이면 상태 갱신 타이밍이 어긋남)
+        window.location.replace(returnTo);
       })
       .catch((err) => {
         if (cancelled) return;

@@ -59,18 +59,18 @@ button:disabled {
   outline: none;
 }
 
-/* 입력창 포커스 - 테두리 대신 살짝 확대되는 느낌 */
+/* 입력창 포커스 - 은은한 링. 예전엔 scale(1.02)로 확대했는데 폭이 넓은
+   입력창(공약 제목 등)에서는 레이아웃이 툭 튀어 과하게 느껴져서 링으로 바꿈 */
 input,
 textarea,
 select {
-  transition: transform 0.15s ease;
-  transform-origin: center;
+  transition: box-shadow 0.15s ease;
 }
 
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  transform: scale(1.02);
+  box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.25);
 }
 
 /* 히어로 배경 사진 - 아주 느린 켄 번즈 줌 */
