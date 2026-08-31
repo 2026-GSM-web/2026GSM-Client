@@ -1,9 +1,10 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { startDataGsmLogin } from '@/lib/auth';
+import { useAuth } from '@/app/auth-provider';
 import { ApiError, STATUS_LABELS, Suggestion, createSuggestion, getMySuggestions } from '@/lib/api';
 
 const DEPARTMENTS = [
@@ -24,12 +25,12 @@ function statusBadgeClass(status: Suggestion['status']) {
   return `${base} bg-navy/10 text-navy border-navy/30 dark:bg-blue-400/10 dark:text-blue-400 dark:border-blue-400/30`;
 }
 
-function CreatePolicyPageContent() {
+export default function CreatePolicyPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  // URL 파라미터를 통한 로그인 상태 확인
-  const isLogged = searchParams.get('isLoggedIn') === 'true';
+  // 로그인 상태는 토큰 기반 AuthProvider에서 가져옴 (새로고침·직접 접속에도 유지됨)
+  const { status } = useAuth();
+  const isLogged = status === 'authed';
 
   const [form, setForm] = useState({
     dept: DEPARTMENTS[0],
@@ -90,6 +91,17 @@ function CreatePolicyPageContent() {
       setSubmitting(false);
     }
   };
+
+  // ------------------------------------------------------------- //
+  // 0. 아직 로그인 상태 확인 중 (토큰 검증)
+  // ------------------------------------------------------------- //
+  if (status === 'loading') {
+    return (
+      <main className="min-h-[80vh] flex items-center justify-center px-4">
+        <p className="text-sm opacity-50">불러오는 중...</p>
+      </main>
+    );
+  }
 
   // ------------------------------------------------------------- //
   // 1. 로그인 전: 콜백 에러 화면과 동일하게 화면 중앙에 로그인 유도 카드만 표시
@@ -242,19 +254,5 @@ function CreatePolicyPageContent() {
             </button>
       </form>
     </main>
-  );
-}
-
-export default function CreatePolicyPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-[80vh] flex items-center justify-center px-4">
-          <p className="text-sm opacity-50">불러오는 중...</p>
-        </main>
-      }
-    >
-      <CreatePolicyPageContent />
-    </Suspense>
   );
 }

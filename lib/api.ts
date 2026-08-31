@@ -1,6 +1,8 @@
 // school.https.gsmsv.site 백엔드 API 클라이언트.
 // 스웨거(https://school.https.gsmsv.site/swagger-ui/index.html) 기준으로 작성함.
 
+import { clearToken, getToken } from './auth';
+
 export type SuggestionStatus = 'RECEIVED' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
 
 export const STATUS_LABELS: Record<SuggestionStatus, string> = {
@@ -88,8 +90,7 @@ export class ApiError extends Error {
 }
 
 function authHeader(): HeadersInit {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('sc_jwt');
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -109,7 +110,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    if (res.status === 401) throw new ApiError(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.');
+    if (res.status === 401) {
+      // 토큰이 만료/무효 - 정리하면 AUTH_CHANGE_EVENT가 발생해 앱 전역이 로그아웃 상태로 전환됨
+      clearToken();
+      throw new ApiError(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.');
+    }
     if (res.status === 403) throw new ApiError(403, '이 작업을 수행할 권한이 없습니다.');
     throw new ApiError(res.status, `요청이 실패했습니다. (${res.status})`);
   }

@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { startDataGsmLogin } from '@/lib/auth';
+import { useAuth } from '@/app/auth-provider';
 import {
   ApiError,
   Pledge,
@@ -16,14 +16,12 @@ import {
   deletePledge,
   deleteSuggestion,
   getAllSuggestions,
-  getMe,
   getPledgeProgress,
   getPledges,
   promoteToAdmin,
   updatePledge,
   updatePledgeProgress,
   updateSuggestionStatus,
-  UserInfo,
 } from '@/lib/api';
 
 const BTN_PRIMARY =
@@ -39,34 +37,12 @@ function statusButtonClass(active: boolean) {
   }`;
 }
 
-function AdminPageContent() {
-  const searchParams = useSearchParams();
-
-  const isDataGsmLogged = searchParams.get('isLoggedIn') === 'true';
-
-  // 서버에 실제로 임원(ADMIN)인지 확인하는 단계
-  const [me, setMe] = useState<UserInfo | null>(null);
-  const [meError, setMeError] = useState<string | null>(null);
+export default function AdminPage() {
+  // 로그인·내 정보(권한 포함)는 토큰 기반 AuthProvider에서 가져옴
+  const { status, user, refresh } = useAuth();
   const [promoteCode, setPromoteCode] = useState('');
   const [promoteError, setPromoteError] = useState('');
   const [promoting, setPromoting] = useState(false);
-
-  useEffect(() => {
-    if (!isDataGsmLogged) return;
-
-    let cancelled = false;
-    getMe()
-      .then((user) => {
-        if (!cancelled) setMe(user);
-      })
-      .catch((err) => {
-        if (!cancelled) setMeError(err instanceof ApiError ? err.message : '내 정보를 불러오지 못했습니다.');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isDataGsmLogged]);
 
   const handlePromote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,8 +51,9 @@ function AdminPageContent() {
     setPromoting(true);
     setPromoteError('');
     try {
-      const result = await promoteToAdmin(promoteCode.trim());
-      setMe((prev) => (prev ? { ...prev, role: result.role } : prev));
+      await promoteToAdmin(promoteCode.trim());
+      // 서버 기준으로 role을 다시 읽어와 화면을 갱신
+      await refresh();
       setPromoteCode('');
     } catch (err) {
       setPromoteError(err instanceof ApiError ? err.message : '승격 코드 확인 중 오류가 발생했습니다.');
@@ -145,12 +122,12 @@ function AdminPageContent() {
   };
 
   useEffect(() => {
-    if (me?.role !== 'ADMIN' || activeTab !== 'issues') return;
+    if (user?.role !== 'ADMIN' || activeTab !== 'issues') return;
 
     // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
     const timer = setTimeout(loadIssues, 0);
     return () => clearTimeout(timer);
-  }, [me, activeTab]);
+  }, [user, activeTab]);
 
   const handleSavePercent = async () => {
     const value = Math.min(100, Math.max(0, Math.round(Number(percentInput) || 0)));
@@ -302,9 +279,20 @@ function AdminPageContent() {
   };
 
   // ------------------------------------------------------------- //
-  // 1. DataGSM 로그인 전
+  // 1. 로그인 상태 확인 중 (토큰 검증 + 내 정보 조회)
   // ------------------------------------------------------------- //
-  if (!isDataGsmLogged) {
+  if (status === 'loading' || (status === 'authed' && !user)) {
+    return (
+      <main className="min-h-[80vh] flex items-center justify-center px-4">
+        <p className="text-sm opacity-50">권한 확인 중...</p>
+      </main>
+    );
+  }
+
+  // ------------------------------------------------------------- //
+  // 2. DataGSM 로그인 전
+  // ------------------------------------------------------------- //
+  if (status === 'guest' || !user) {
     return (
       <main className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
@@ -323,30 +311,15 @@ function AdminPageContent() {
   }
 
   // ------------------------------------------------------------- //
-  // 2. 로그인 후, 내 계정의 임원 권한 확인 중
-  // ------------------------------------------------------------- //
-  if (!me) {
-    return (
-      <main className="min-h-[80vh] flex items-center justify-center px-4">
-        {meError ? (
-          <p className="text-sm text-red-500">{meError}</p>
-        ) : (
-          <p className="text-sm opacity-50">권한 확인 중...</p>
-        )}
-      </main>
-    );
-  }
-
-  // ------------------------------------------------------------- //
   // 3. 로그인은 했지만 아직 관리자로 승격되지 않은 계정
   // ------------------------------------------------------------- //
-  if (me.role !== 'ADMIN') {
+  if (user.role !== 'ADMIN') {
     return (
       <main className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
           <h1 className="text-xl font-bold">관리자 승격</h1>
           <p className="text-xs opacity-50">
-            {me.name}님은 아직 관리자 권한이 없습니다. 학생회 담당 서버 관리자에게 전달받은 승격
+            {user.name}님은 아직 관리자 권한이 없습니다. 학생회 담당 서버 관리자에게 전달받은 승격
             코드를 입력해 주세요.
           </p>
           <form onSubmit={handlePromote} className="space-y-4">
@@ -376,7 +349,7 @@ function AdminPageContent() {
     <main className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 pt-12 pb-24 space-y-8">
       <div className="pb-4 border-b border-black/10 dark:border-white/10">
         <h1 className="text-2xl font-bold">관리자 대시보드</h1>
-        <p className="text-xs opacity-50 mt-1">{me.name}님으로 로그인됨</p>
+        <p className="text-xs opacity-50 mt-1">{user.name}님으로 로그인됨</p>
       </div>
 
       <div className="flex justify-between items-center border-b border-black/10 dark:border-white/10 pb-3 flex-wrap gap-3">
@@ -579,19 +552,5 @@ function AdminPageContent() {
       )}
 
     </main>
-  );
-}
-
-export default function AdminPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-[80vh] flex items-center justify-center px-4">
-          <p className="text-sm opacity-50">불러오는 중...</p>
-        </main>
-      }
-    >
-      <AdminPageContent />
-    </Suspense>
   );
 }

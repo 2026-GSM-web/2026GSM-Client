@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { OAUTH_RETURN_TO_KEY, startDataGsmLogin } from '@/lib/auth';
+import { OAUTH_RETURN_TO_KEY, setToken, startDataGsmLogin } from '@/lib/auth';
 
 // 백엔드가 로그인 실패 시 쿼리스트링으로 돌려줄 수 있는 error 코드별 안내 문구
 const ERROR_MESSAGES: Record<string, string> = {};
@@ -31,14 +31,16 @@ function CallbackContent() {
       return () => clearTimeout(timer);
     }
 
-    localStorage.setItem('sc_jwt', token);
+    // 토큰을 저장하면 AUTH_CHANGE_EVENT가 발생해 AuthProvider가 /api/auth/me로
+    // 로그인 상태를 검증함 - 이후 페이지들은 URL 파라미터가 아니라 이 상태를 본다
+    setToken(token);
 
     // 로그인을 어디서 시작했는지에 따라 되돌아갈 위치가 달라짐(정책 제안 작성 / 관리자
     // 페이지 등). 로그인 시작 시 sessionStorage에 남겨둔 값을 읽고, 없으면 기존 기본
     // 동작(정책 제안 작성 페이지)으로 이동
     const returnTo = sessionStorage.getItem(OAUTH_RETURN_TO_KEY) || '/policies/create';
     sessionStorage.removeItem(OAUTH_RETURN_TO_KEY);
-    router.replace(`${returnTo}?isLoggedIn=true`);
+    router.replace(returnTo);
   }, [oauthError, router]);
 
   const error = oauthError ?? tokenError;
