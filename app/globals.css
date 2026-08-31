@@ -59,18 +59,19 @@ button:disabled {
   outline: none;
 }
 
-/* 입력창 포커스 - 은은한 링. 예전엔 scale(1.02)로 확대했는데 폭이 넓은
-   입력창(공약 제목 등)에서는 레이아웃이 툭 튀어 과하게 느껴져서 링으로 바꿈 */
+/* 입력창 포커스 - 아주 살짝만 확대. 예전 scale(1.02)는 폭 넓은 입력창에서
+   레이아웃이 툭 튀어 과했고, 링(box-shadow)은 너무 튀어서 미세 확대로 절충 */
 input,
 textarea,
 select {
-  transition: box-shadow 0.15s ease;
+  transition: transform 0.12s ease;
+  transform-origin: center;
 }
 
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.25);
+  transform: scale(1.008);
 }
 
 /* 히어로 배경 사진 - 아주 느린 켄 번즈 줌 */
