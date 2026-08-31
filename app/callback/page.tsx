@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OAUTH_RETURN_TO_KEY, startDataGsmLogin } from '@/lib/auth';
+import { ApiError, getMe } from '@/lib/api';
 
 // 백엔드가 로그인 실패 시 쿼리스트링으로 돌려줄 수 있는 error 코드별 안내 문구
 const ERROR_MESSAGES: Record<string, string> = {};
@@ -18,27 +19,30 @@ function CallbackContent() {
   useEffect(() => {
     if (oauthError) return;
 
-    // 백엔드가 school SSO 로그인을 끝낸 뒤 이 페이지로 `#token=<JWT>` 형태로 되돌려줌
-    // (해시는 서버로 전송되지 않으므로 클라이언트에서 직접 읽어야 함)
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    const token = hashParams.get('token');
+    let cancelled = false;
 
-    if (!token) {
-      // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
-      const timer = setTimeout(() => {
-        setTokenError('로그인 응답에서 인증 정보를 찾지 못했습니다. 다시 로그인해 주세요.');
-      }, 0);
-      return () => clearTimeout(timer);
-    }
+    // 백엔드가 school SSO 로그인을 끝내면 ACCESS_TOKEN을 httpOnly 쿠키로 설정한 뒤 이
+    // 페이지로 리다이렉트한다 - URL에는 토큰이 실려오지 않고(httpOnly라 JS로도 못 읽음),
+    // 이후 요청에 쿠키가 자동으로 실린다. 그래서 로그인 성공 여부는 실제로 인증이 붙는
+    // /api/auth/me를 호출해서 확인한다.
+    getMe()
+      .then(() => {
+        if (cancelled) return;
+        // 로그인을 어디서 시작했는지에 따라 되돌아갈 위치가 달라짐(정책 제안 작성 / 관리자
+        // 페이지 등). 로그인 시작 시 sessionStorage에 남겨둔 값을 읽고, 없으면 기존 기본
+        // 동작(정책 제안 작성 페이지)으로 이동
+        const returnTo = sessionStorage.getItem(OAUTH_RETURN_TO_KEY) || '/policies/create';
+        sessionStorage.removeItem(OAUTH_RETURN_TO_KEY);
+        router.replace(`${returnTo}?isLoggedIn=true`);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setTokenError(err instanceof ApiError ? err.message : '로그인 처리에 실패했습니다. 다시 로그인해 주세요.');
+      });
 
-    localStorage.setItem('sc_jwt', token);
-
-    // 로그인을 어디서 시작했는지에 따라 되돌아갈 위치가 달라짐(정책 제안 작성 / 관리자
-    // 페이지 등). 로그인 시작 시 sessionStorage에 남겨둔 값을 읽고, 없으면 기존 기본
-    // 동작(정책 제안 작성 페이지)으로 이동
-    const returnTo = sessionStorage.getItem(OAUTH_RETURN_TO_KEY) || '/policies/create';
-    sessionStorage.removeItem(OAUTH_RETURN_TO_KEY);
-    router.replace(`${returnTo}?isLoggedIn=true`);
+    return () => {
+      cancelled = true;
+    };
   }, [oauthError, router]);
 
   const error = oauthError ?? tokenError;
