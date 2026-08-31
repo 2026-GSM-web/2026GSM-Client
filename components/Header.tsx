@@ -72,7 +72,7 @@ export default function Header() {
 
   return (
     <header
-      className={`relative sticky top-0 z-50 transition-colors duration-300 ${
+      className={`sticky top-0 z-50 transition-colors duration-300 ${
         overHero ? '' : lightHeader ? 'bg-white border-b border-black/10 shadow-sm' : 'navy-surface'
       }`}
       style={
