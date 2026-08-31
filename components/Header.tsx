@@ -142,8 +142,7 @@ export default function Header() {
           </button>
 
           {/* 로그인 - /api/auth/me 확인이 끝난(mounted + loading 아님) 뒤에만 노출해
-              깜빡임을 막음. 로그아웃은 백엔드에 세션 종료 엔드포인트가 없고 ACCESS_TOKEN이
-              httpOnly 쿠키라 프론트에서 지울 수 없어 아직 미제공 (TODO: 백엔드 로그아웃 API) */}
+              깜빡임을 막음. 개인 기기 전제라 로그아웃은 두지 않음(토큰 만료로 자연 정리) */}
           {mounted && status === 'guest' && (
             <button
               type="button"
