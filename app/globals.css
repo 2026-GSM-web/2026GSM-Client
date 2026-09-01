@@ -8,6 +8,15 @@
   --color-navy-light: #6fa8d1;
 }
 
+/* 모든 폰트 유틸리티(font-sans/serif/mono)를 Pretendard 하나로 통일.
+   next/font가 런타임에 채워주는 --font-pretendard를 참조해야 하므로
+   값을 그대로 통과시키는 @theme inline 사용 */
+@theme inline {
+  --font-sans: var(--font-pretendard);
+  --font-serif: var(--font-pretendard);
+  --font-mono: var(--font-pretendard);
+}
+
 /* 헤더/푸터/카드 등 큼직한 포인트 컬러 면에 쓰는 배경 - 단일 flat 색상 */
 .navy-surface {
   background: #4682b4;
