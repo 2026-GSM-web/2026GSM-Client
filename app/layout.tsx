@@ -23,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" suppressHydrationWarning className={pretendard.variable}>
-      <body className="font-(family-name:--font-pretendard) min-h-screen flex flex-col">
+      <body className="font-sans min-h-screen flex flex-col">
         <Providers>
           <AuthProvider>
             <Header />
