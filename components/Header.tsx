@@ -12,9 +12,12 @@ export default function Header() {
   const { setTheme, resolvedTheme } = useTheme();
   const { status } = useAuth();
   const [mounted, setMounted] = useState(false);
-  // 홈 화면 맨 위(히어로 사진 위)에 있을 때는 헤더가 사진과 이어지도록 투명하게,
-  // 스크롤하면 흰색(라이트 모드) 또는 네이비(다크 모드)로 전환
-  const [overHero, setOverHero] = useState(false);
+  // 홈에서만 헤더가 히어로 위에 겹쳐 뜨고(fixed) 최상단에서는 투명하다.
+  // 그 외 페이지에서는 흐름을 차지하는 일반 헤더(sticky)를 쓴다.
+  const overHero = pathname === '/';
+  // 페이지 최상단 근처(scrollY < 80)인지 여부 - 스크롤을 내리면 홈 헤더에 배경을
+  // 깔고(글씨 색도 뒤집고) 좌측 'GSM 학생회' 로고를 숨긴다
+  const [atTop, setAtTop] = useState(true);
 
   useEffect(() => {
     // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
@@ -25,20 +28,15 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    if (pathname !== '/') {
-      // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
-      const timer = setTimeout(() => setOverHero(false), 0);
-      return () => clearTimeout(timer);
-    }
-
-    const onScroll = () => setOverHero(window.scrollY < 80);
+    const onScroll = () => setAtTop(window.scrollY < 80);
+    // ESLint react-hooks/set-state-in-effect 경고를 회피하기 위해 한 스텝 지연
     const timer = setTimeout(onScroll, 0);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       clearTimeout(timer);
       window.removeEventListener('scroll', onScroll);
     };
-  }, [pathname]);
+  }, []);
 
   const isDark = resolvedTheme === 'dark';
 
@@ -55,13 +53,15 @@ export default function Header() {
     window.history.pushState(null, '', '/#orgchart');
   };
 
-  // 스크롤해서 히어로를 벗어났고, 라이트 모드일 때만 흰 바탕(+어두운 글씨)
-  const lightHeader = !overHero && mounted && !isDark;
+  // 헤더가 완전히 투명한 상태: 홈이면서 페이지 최상단일 때만(히어로가 그대로 비침).
+  // 그 외에는 뒤 배경이 밝을 수 있어 배경을 깔고 글씨 색을 뒤집는다.
+  const transparentHeader = overHero && atTop;
 
-  // 히어로를 벗어났는지 여부 - 테마와 무관하게 건의하기 버튼 색 전환에 사용.
-  // (헤더 배경 자체는 라이트일 때만 흰색이지만, 다크 모드에서도 스크롤하면
-  // navy-surface 다크 배경으로 바뀌므로 버튼도 함께 반응해야 함)
-  const scrolled = !overHero && mounted;
+  // 밝은 배경(프로스트 흰색) + 어두운 글씨 - 라이트 모드에서 투명 상태가 아닐 때
+  const lightHeader = !transparentHeader && mounted && !isDark;
+
+  // 투명 상태가 아니면 건의하기 버튼도 흰색 대신 채워진 네이비로
+  const scrolled = !transparentHeader && mounted;
 
   // 평소엔 배경 없이 텍스트만, 마우스를 올리면 배경이 나타남
   const linkClass = `px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition whitespace-nowrap ${
@@ -72,32 +72,22 @@ export default function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-colors duration-300 ${
-        overHero ? '' : lightHeader ? 'bg-white border-b border-black/10 shadow-sm' : 'navy-surface'
+      className={`${overHero ? 'fixed inset-x-0 top-0' : 'sticky top-0'} z-50 transition-colors duration-300 ${
+        transparentHeader
+          ? 'bg-transparent'
+          : lightHeader
+            ? 'bg-white/85 backdrop-blur-md border-b border-black/10 shadow-sm'
+            : 'navy-surface'
       }`}
-      style={
-        overHero
-          ? {
-              backgroundImage: "url('/images/hero-school.webp')",
-              backgroundSize: 'cover',
-              backgroundPosition: 'center top',
-              backgroundAttachment: 'fixed',
-            }
-          : undefined
-      }
     >
-      {/* 히어로 사진 위 헤더 - 사진 위에 바로 글씨가 얹히면 안 읽혀서 단색 톤을
-          깔아줌. app/page.tsx 히어로 섹션의 오버레이(bg-[#33618a]/85,
-          dark:bg-[#0a121c]/92)와 색·투명도를 정확히 맞춰서 경계선이 보이지 않게 함 */}
-      {overHero && (
-        <div className={`absolute inset-0 ${isDark ? 'bg-[#0a121c]/92' : 'bg-[#33618a]/85'}`} />
-      )}
       <div className="relative max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link
           href="/"
-          className={`font-bold text-base sm:text-lg tracking-tight shrink-0 whitespace-nowrap ${
+          aria-hidden={!atTop}
+          tabIndex={atTop ? undefined : -1}
+          className={`font-bold text-base sm:text-lg tracking-tight shrink-0 whitespace-nowrap transition-opacity duration-300 ${
             lightHeader ? 'text-navy' : 'text-white'
-          }`}
+          } ${atTop ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         >
           GSM 학생회
         </Link>
