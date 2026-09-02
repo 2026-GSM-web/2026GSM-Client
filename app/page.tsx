@@ -259,7 +259,7 @@ export default function MainPage() {
         <h2 className="reveal-heading text-2xl sm:text-3xl font-black mt-4">학생회 조직 구성</h2>
 
         <div className="flex flex-col items-center mt-8">
-          <div className="navy-surface text-white px-8 py-4 text-center shadow-sm rounded-md">
+          <div className="navy-surface text-white px-8 py-4 text-center shadow-sm rounded-md cursor-default transition-transform duration-200 hover:scale-[1.05]">
             <div className="font-bold text-sm">{PRESIDENT.role}</div>
             <div className="text-xs text-white/70 mt-1">{PRESIDENT.name}</div>
           </div>
@@ -274,7 +274,7 @@ export default function MainPage() {
             {VICE_PRESIDENTS.map((vp) => (
               <div
                 key={vp.name}
-                className="navy-surface text-white px-6 py-3 text-center shadow-sm rounded-md"
+                className="navy-surface text-white px-6 py-3 text-center shadow-sm rounded-md cursor-default transition-transform duration-200 hover:scale-[1.05]"
               >
                 <div className="font-bold text-sm">{vp.role}</div>
                 <div className="text-xs text-white/70 mt-1">{vp.name}</div>
@@ -287,7 +287,7 @@ export default function MainPage() {
           {DEPARTMENTS.map((d) => (
             <div
               key={d.dept}
-              className="p-4 rounded-md border border-black/10 dark:border-white/10 text-center bg-white/70 dark:bg-white/5 transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-navy/30 dark:hover:border-blue-400/40"
+              className="p-4 rounded-md border border-black/10 dark:border-white/10 text-center bg-white/70 dark:bg-white/5 cursor-default transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-navy/30 dark:hover:border-blue-400/40"
             >
               <div className="font-bold text-sm">{d.dept}</div>
               <div className="text-xs opacity-60 mt-2"> 부장 {d.head} </div>
