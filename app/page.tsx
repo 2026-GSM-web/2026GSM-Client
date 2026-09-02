@@ -145,7 +145,9 @@ export default function MainPage() {
             className="text-sm sm:text-base text-white/80 mt-6 max-w-md leading-relaxed opacity-0"
             style={{ animation: 'fade-up 0.8s ease-out 0.5s forwards' }}
           >
-            학생 한 사람의 목소리가 학교의 하루를 바꿉니다. 오늘의 학교를 함께 기록합니다.
+            학생 한 사람의 목소리가 학교의 하루를 바꿉니다.
+            <br />
+            오늘의 학교를 함께 기록합니다.
           </p>
         </div>
       </section>
@@ -159,9 +161,9 @@ export default function MainPage() {
           <h2 className="reveal-heading text-2xl sm:text-3xl font-black leading-snug">
             안녕하십니까,
             <br />
-            2026-2027년도 여러분과 함께할 
-            <br/>
-             제 9대 학생자치회입니다.
+            2026-2027년도 여러분과 함께할
+            <br />
+            제 9대 학생자치회입니다.
           </h2>
           <div
             className="space-y-4 text-sm sm:text-base opacity-80 leading-relaxed lg:pl-8 lg:border-l lg:border-black/10 dark:lg:border-white/10"
