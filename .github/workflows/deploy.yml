@@ -16,9 +16,13 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd ~/2026GSM
             git fetch origin main
             git reset --hard origin/main
+            # 추적되지 않는 잔여물(과거 중첩 클론 ~/2026GSM/2026GSM 등) 제거
+            # -ff 는 별도 .git 을 가진 디렉터리까지 삭제, .env.local 등 gitignore 파일은 보존
+            git clean -ffd
             source ~/.nvm/nvm.sh
             rm -rf .next
             npm install
