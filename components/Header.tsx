@@ -48,11 +48,11 @@ export default function Header() {
 
   // Next.js Link의 해시 이동이 같은 페이지 안에서는 한 번에 스크롤되지 않는
   // 경우가 있어, 홈에 있을 때는 직접 스크롤 처리
-  const handleOrgchartClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleHashClick = (id: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (pathname !== '/') return;
     e.preventDefault();
-    document.getElementById('orgchart')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.history.pushState(null, '', '/#orgchart');
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.pushState(null, '', `/#${id}`);
   };
 
   // 스크롤해서 히어로를 벗어났고, 라이트 모드일 때만 흰 바탕(+어두운 글씨)
@@ -106,7 +106,13 @@ export default function Header() {
           <Link href="/" className={linkClass}>
             홈
           </Link>
-          <Link href="/#orgchart" className={linkClass} onClick={handleOrgchartClick}>
+          <Link href="/#about" className={linkClass} onClick={handleHashClick('about')}>
+            소개
+          </Link>
+          <Link href="/#pledges" className={linkClass} onClick={handleHashClick('pledges')}>
+            이행 현황
+          </Link>
+          <Link href="/#orgchart" className={linkClass} onClick={handleHashClick('orgchart')}>
             조직도
           </Link>
           <Link
