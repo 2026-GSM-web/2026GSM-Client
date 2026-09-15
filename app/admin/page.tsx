@@ -46,14 +46,15 @@ export default function AdminPage() {
   const [promoteCode, setPromoteCode] = useState('');
   const [promoteError, setPromoteError] = useState('');
   const [promoting, setPromoting] = useState(false);
-  const [promoteAttempts, setPromoteAttempts] = useState(0);
-
-  // 탭을 닫았다 열어도 시도 횟수 제한을 우회할 수 없도록 로컬 스토리지에서 복원
-  // (서버도 사용자 기준으로 5회 초과 시 영구 차단하므로, 이건 어디까지나 보조적인 UX용)
-  useEffect(() => {
+  // 탭을 닫았다 열어도 시도 횟수 제한을 우회할 수 없도록 로컬 스토리지에서 초기값을 복원
+  // (서버도 사용자 기준으로 5회 초과 시 영구 차단하므로, 이건 어디까지나 보조적인 UX용).
+  // 이 값에 의존하는 화면은 status가 'loading'을 벗어난 뒤(클라이언트 전용 렌더)에만 그려지므로
+  // 하이드레이션 불일치 없이 lazy initializer에서 바로 읽어도 안전함
+  const [promoteAttempts, setPromoteAttempts] = useState(() => {
+    if (typeof window === 'undefined') return 0;
     const saved = Number(localStorage.getItem(PROMOTE_ATTEMPTS_KEY) ?? '0');
-    if (Number.isFinite(saved) && saved > 0) setPromoteAttempts(saved);
-  }, []);
+    return Number.isFinite(saved) && saved > 0 ? saved : 0;
+  });
 
   const promoteLocked = promoteAttempts >= MAX_PROMOTE_ATTEMPTS;
 
@@ -71,21 +72,20 @@ export default function AdminPage() {
       localStorage.removeItem(PROMOTE_ATTEMPTS_KEY);
       setPromoteAttempts(0);
     } catch (err) {
-      // 서버가 429(시도 횟수 초과, 영구 차단)를 반환하면 그 즉시 완전히 잠금
+      // 서버가 429(시도 횟수 초과, 영구 차단)를 반환하면 그 즉시 완전히 잠금.
+      // 잠기고 나면 이 화면 대신 별도의 "접근 제한" 화면이 렌더링되므로 메시지는
+      // 잠기기 전(일반 실패)에만 보여주면 됨
       if (err instanceof ApiError && err.status === 429) {
         localStorage.setItem(PROMOTE_ATTEMPTS_KEY, String(MAX_PROMOTE_ATTEMPTS));
         setPromoteAttempts(MAX_PROMOTE_ATTEMPTS);
-        setPromoteError(err.message);
       } else {
         const nextAttempts = promoteAttempts + 1;
         localStorage.setItem(PROMOTE_ATTEMPTS_KEY, String(nextAttempts));
         setPromoteAttempts(nextAttempts);
         setPromoteError(
-          nextAttempts >= MAX_PROMOTE_ATTEMPTS
-            ? `승격 코드를 ${MAX_PROMOTE_ATTEMPTS}회 잘못 입력했습니다. 더 이상 시도할 수 없습니다.`
-            : err instanceof ApiError
-              ? `${err.message} (${nextAttempts}/${MAX_PROMOTE_ATTEMPTS}회 시도)`
-              : `승격 코드 확인 중 오류가 발생했습니다. (${nextAttempts}/${MAX_PROMOTE_ATTEMPTS}회 시도)`
+          err instanceof ApiError
+            ? `${err.message} (${nextAttempts}/${MAX_PROMOTE_ATTEMPTS}회 시도)`
+            : `승격 코드 확인 중 오류가 발생했습니다. (${nextAttempts}/${MAX_PROMOTE_ATTEMPTS}회 시도)`
         );
       }
     } finally {
@@ -345,6 +345,20 @@ export default function AdminPage() {
   // 3. 로그인은 했지만 아직 관리자로 승격되지 않은 계정
   // ------------------------------------------------------------- //
   if (user.role !== 'ADMIN') {
+    if (promoteLocked) {
+      return (
+        <main className="min-h-[80vh] flex items-center justify-center px-4">
+          <div className="w-full max-w-sm p-8 border border-red-500/30 rounded-2xl space-y-3 bg-red-500/5 text-center">
+            <h1 className="text-xl font-bold text-red-600">접근이 제한되었습니다</h1>
+            <p className="text-xs opacity-70">
+              관리자 승격 코드를 {MAX_PROMOTE_ATTEMPTS}회 잘못 입력하여 더 이상 시도할 수 없습니다.
+              학생회 담당 서버 관리자에게 문의해 주세요.
+            </p>
+          </div>
+        </main>
+      );
+    }
+
     return (
       <main className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm p-8 border border-black/10 dark:border-white/10 rounded-2xl space-y-5 bg-white/70 dark:bg-white/5">
@@ -360,16 +374,15 @@ export default function AdminPage() {
               className={INPUT_CLASS}
               value={promoteCode}
               onChange={(e) => setPromoteCode(e.target.value)}
-              disabled={promoteLocked}
               autoFocus
             />
             {promoteError && <p className="text-xs text-red-500 font-medium">{promoteError}</p>}
             <button
               type="submit"
-              disabled={promoting || promoteLocked}
+              disabled={promoting}
               className={`w-full py-2.5 text-sm rounded-lg ${BTN_PRIMARY} disabled:opacity-50`}
             >
-              {promoteLocked ? '시도 횟수 초과' : promoting ? '확인 중...' : '승격하기'}
+              {promoting ? '확인 중...' : '승격하기'}
             </button>
           </form>
         </div>
