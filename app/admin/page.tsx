@@ -24,6 +24,9 @@ import {
   updateSuggestionStatus,
 } from '@/lib/api';
 
+const PROMOTE_ATTEMPTS_KEY = 'sc_admin_promote_attempts';
+const MAX_PROMOTE_ATTEMPTS = 5;
+
 const BTN_PRIMARY =
   'navy-surface dark:bg-blue-500 dark:bg-none text-white font-semibold hover:brightness-110 dark:hover:bg-blue-400 active:brightness-90 transition';
 const INPUT_CLASS =
@@ -43,10 +46,20 @@ export default function AdminPage() {
   const [promoteCode, setPromoteCode] = useState('');
   const [promoteError, setPromoteError] = useState('');
   const [promoting, setPromoting] = useState(false);
+  const [promoteAttempts, setPromoteAttempts] = useState(0);
+
+  // 탭을 닫았다 열어도 시도 횟수 제한을 우회할 수 없도록 로컬 스토리지에서 복원
+  // (서버도 사용자 기준으로 5회 초과 시 영구 차단하므로, 이건 어디까지나 보조적인 UX용)
+  useEffect(() => {
+    const saved = Number(localStorage.getItem(PROMOTE_ATTEMPTS_KEY) ?? '0');
+    if (Number.isFinite(saved) && saved > 0) setPromoteAttempts(saved);
+  }, []);
+
+  const promoteLocked = promoteAttempts >= MAX_PROMOTE_ATTEMPTS;
 
   const handlePromote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!promoteCode.trim()) return;
+    if (!promoteCode.trim() || promoteLocked) return;
 
     setPromoting(true);
     setPromoteError('');
@@ -55,8 +68,26 @@ export default function AdminPage() {
       // 서버 기준으로 role을 다시 읽어와 화면을 갱신
       await refresh();
       setPromoteCode('');
+      localStorage.removeItem(PROMOTE_ATTEMPTS_KEY);
+      setPromoteAttempts(0);
     } catch (err) {
-      setPromoteError(err instanceof ApiError ? err.message : '승격 코드 확인 중 오류가 발생했습니다.');
+      // 서버가 429(시도 횟수 초과, 영구 차단)를 반환하면 그 즉시 완전히 잠금
+      if (err instanceof ApiError && err.status === 429) {
+        localStorage.setItem(PROMOTE_ATTEMPTS_KEY, String(MAX_PROMOTE_ATTEMPTS));
+        setPromoteAttempts(MAX_PROMOTE_ATTEMPTS);
+        setPromoteError(err.message);
+      } else {
+        const nextAttempts = promoteAttempts + 1;
+        localStorage.setItem(PROMOTE_ATTEMPTS_KEY, String(nextAttempts));
+        setPromoteAttempts(nextAttempts);
+        setPromoteError(
+          nextAttempts >= MAX_PROMOTE_ATTEMPTS
+            ? `승격 코드를 ${MAX_PROMOTE_ATTEMPTS}회 잘못 입력했습니다. 더 이상 시도할 수 없습니다.`
+            : err instanceof ApiError
+              ? `${err.message} (${nextAttempts}/${MAX_PROMOTE_ATTEMPTS}회 시도)`
+              : `승격 코드 확인 중 오류가 발생했습니다. (${nextAttempts}/${MAX_PROMOTE_ATTEMPTS}회 시도)`
+        );
+      }
     } finally {
       setPromoting(false);
     }
@@ -329,15 +360,16 @@ export default function AdminPage() {
               className={INPUT_CLASS}
               value={promoteCode}
               onChange={(e) => setPromoteCode(e.target.value)}
+              disabled={promoteLocked}
               autoFocus
             />
             {promoteError && <p className="text-xs text-red-500 font-medium">{promoteError}</p>}
             <button
               type="submit"
-              disabled={promoting}
+              disabled={promoting || promoteLocked}
               className={`w-full py-2.5 text-sm rounded-lg ${BTN_PRIMARY} disabled:opacity-50`}
             >
-              {promoting ? '확인 중...' : '승격하기'}
+              {promoteLocked ? '시도 횟수 초과' : promoting ? '확인 중...' : '승격하기'}
             </button>
           </form>
         </div>
