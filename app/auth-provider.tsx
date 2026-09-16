@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { ApiError, getMe, UserInfo } from '@/lib/api';
+import { ApiError, getMe, setUnauthorizedHandler, UserInfo } from '@/lib/api';
 
 // 'loading' : 아직 로그인 여부 확인 중 (SSR·첫 렌더는 항상 이 값)
 // 'authed'  : ACCESS_TOKEN 쿠키로 /api/auth/me 조회까지 성공
@@ -49,6 +49,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timer = setTimeout(check, 0);
     return () => clearTimeout(timer);
   }, [check]);
+
+  useEffect(() => {
+    // 정책 제안 작성/조회, 관리자 페이지 등 이 파일 밖에서 호출하는 API가 401을 받아도
+    // 곧바로 로그인 만료 상태로 반영되도록 전역 핸들러로 등록해둠. 이게 없으면 각 화면은
+    // 토큰이 만료된 뒤에도 계속 'authed'로 알고 있어서, 만료 메시지만 뜨고 로그인 화면으로
+    // 못 돌아가는 문제가 생김.
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setStatus('guest');
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ status, user, refresh: check }}>

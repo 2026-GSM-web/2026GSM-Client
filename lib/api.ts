@@ -87,6 +87,16 @@ export class ApiError extends Error {
   }
 }
 
+// 401은 이 파일 밖 컴포넌트에서도 발생하는데(정책 제안 작성/조회, 관리자 페이지 등),
+// 그 자리마다 로그인 화면 전환을 각각 처리하면 하나라도 빠뜨리기 쉬움. 대신 AuthProvider가
+// 여기에 콜백을 등록해두면, 어느 API 호출에서 401이 나든 즉시 전역 로그인 상태를 'guest'로
+// 떨어뜨려서 화면이 자동으로 로그인 유도 화면으로 바뀜.
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_AUTH_API_URL;
   if (!apiBaseUrl) {
@@ -105,7 +115,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    if (res.status === 401) throw new ApiError(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.');
+    if (res.status === 401) {
+      onUnauthorized?.();
+      throw new ApiError(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.');
+    }
     if (res.status === 403) throw new ApiError(403, '이 작업을 수행할 권한이 없습니다.');
     throw new ApiError(res.status, `요청이 실패했습니다. (${res.status})`);
   }
