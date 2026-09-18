@@ -147,9 +147,12 @@ export default function Header() {
             )}
           </button>
 
-          {/* 로그인 - /api/auth/me 확인이 끝난(mounted + loading 아님) 뒤에만 노출해
-              깜빡임을 막음. 개인 기기 전제라 로그아웃은 두지 않음(토큰 만료로 자연 정리) */}
-          {mounted && status === 'guest' && (
+          {/* 로그인 - /api/auth/me 확인(status==='loading')이 끝나야만 노출하면, 그 네트워크
+              왕복 동안(히어로 애니메이션 재생 시간과 우연히 겹침) 게스트에게 버튼이 안 보임.
+              대신 "확실히 로그인됨"이 아니면 바로 보여주고, 실제로 로그인된 사람만 확인 끝나고
+              아주 잠깐 사라지는 쪽을 택함 - 방문자 대부분은 게스트라 이 편이 체감 지연이 적음.
+              개인 기기 전제라 로그아웃은 두지 않음(토큰 만료로 자연 정리) */}
+          {mounted && status !== 'authed' && (
             <button
               type="button"
               onClick={() => startDataGsmLogin(pathname || '/')}
